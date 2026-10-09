@@ -3,7 +3,9 @@ import { accessAllowed } from "@/lib/access";
 import { ExtractionError, extractFile, hasExtractionKey } from "@/lib/extract/client";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+// Scanned documents on a busy free-tier model can take minutes; the Gemini provider stops at
+// 270 s with a clear message, before the platform would cut the request off.
+export const maxDuration = 300;
 
 const MAX_BYTES = 20 * 1024 * 1024;
 

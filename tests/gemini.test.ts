@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { geminiProvider, QuotaExhaustedError } from "../src/lib/extract/providers/gemini";
+import { geminiProvider, OverloadedError, QuotaExhaustedError } from "../src/lib/extract/providers/gemini";
 import type { ReadTask } from "../src/lib/extract/providers/types";
 
 const file = { name: "doc.pdf", mediaType: "application/pdf", base64: "" };
@@ -47,6 +47,30 @@ describe("Gemini model chain", () => {
     expect(err.message).toMatch(/about 9 h/);
     expect(err.message).toMatch(/sample shipment still works/);
   });
+
+  it("moves straight to the next model when one is overloaded (no in-place retries)", async () => {
+    const models = stubFetch(() => status(503, "high demand"), () => ok({ y: 1 }));
+    expect((await geminiProvider(["busy", "free"], { secondPassDelayMs: 0 }).transcribe(file, task, null)).output).toEqual({ y: 1 });
+    expect(models).toEqual(["busy", "free"]);
+  });
+
+  it("gives busy models one more pass, then explains the overload instead of timing out", async () => {
+    const models = stubFetch(...Array(4).fill(() => status(503, "high demand")));
+    const err = await geminiProvider(["a", "b"], { secondPassDelayMs: 0 }).transcribe(file, task, null).catch((e) => e);
+    expect(err).toBeInstanceOf(OverloadedError);
+    expect(err.message).toMatch(/overloaded right now/);
+    expect(models).toEqual(["a", "b", "a", "b"]);
+  });
+
+  it("stops before the deadline rather than letting the platform kill the request", async () => {
+    vi.stubGlobal("fetch", vi.fn((_u: string, init: RequestInit) => new Promise((_r, reject) => {
+      init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+    })));
+    const t0 = Date.now();
+    const err = await geminiProvider(["slow"], { deadlineMs: 5_200, secondPassDelayMs: 0 }).transcribe(file, task, null).catch((e) => e);
+    expect(err).toBeInstanceOf(OverloadedError);
+    expect(Date.now() - t0).toBeLessThan(6_500);
+  }, 10_000);
 
   it("fails at once on a real error (bad key) instead of hiding it behind fallbacks", async () => {
     const models = stubFetch(() => status(400, "API key not valid"), () => ok({}));
