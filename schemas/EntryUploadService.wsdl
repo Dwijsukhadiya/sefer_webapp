@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Retrieved 2026-10-08 from https://www.netchb.com/main/services/entry/EntryUploadService?wsdl
+     (see schemas/SOURCE.md). Message parts for uploadEntry / amendEntry / queryEntryStatus kept verbatim;
+     other operations trimmed to their signatures for brevity. -->
+<definitions name="EntryUploadWebService" targetNamespace="http://www.netchb.com/"
+  xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+  xmlns:tns="http://www.netchb.com/" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <types></types>
+  <message name="EntryUploadService_uploadEntry">
+    <part name="username" type="xsd:string"/>
+    <part name="password" type="xsd:string"/>
+    <part name="entryXml" type="xsd:string"/>
+  </message>
+  <message name="EntryUploadService_uploadEntryResponse">
+    <part name="result" type="xsd:string"/>
+  </message>
+  <message name="EntryUploadService_amendEntry">
+    <part name="username" type="xsd:string"/>
+    <part name="password" type="xsd:string"/>
+    <part name="entryXml" type="xsd:string"/>
+  </message>
+  <message name="EntryUploadService_amendEntryResponse">
+    <part name="result" type="xsd:string"/>
+  </message>
+  <message name="EntryUploadService_queryEntryStatus">
+    <part name="username" type="xsd:string"/>
+    <part name="password" type="xsd:string"/>
+    <part name="entryNumber" type="xsd:string"/>
+    <part name="externalReferenceNumber" type="xsd:string"/>
+  </message>
+  <message name="EntryUploadService_queryEntryStatusResponse">
+    <part name="result" type="xsd:string"/>
+  </message>
+  <portType name="EntryUploadService">
+    <operation name="uploadEntry" parameterOrder="username password entryXml">
+      <input message="tns:EntryUploadService_uploadEntry"/>
+      <output message="tns:EntryUploadService_uploadEntryResponse"/>
+    </operation>
+    <operation name="amendEntry" parameterOrder="username password entryXml">
+      <input message="tns:EntryUploadService_amendEntry"/>
+      <output message="tns:EntryUploadService_amendEntryResponse"/>
+    </operation>
+    <operation name="queryEntryStatus" parameterOrder="username password entryNumber externalReferenceNumber">
+      <input message="tns:EntryUploadService_queryEntryStatus"/>
+      <output message="tns:EntryUploadService_queryEntryStatusResponse"/>
+    </operation>
+    <!-- Also exposed: queryType86EntryStatus(username,password,queryTimeRange),
+         updateBol(username,password,bolUpdateXml),
+         deleteType86EntryByMawb(username,password,mawbPrefix,mawbNumber),
+         deleteEntry(username,password,entryNumber,masterBill,entryStatusFilter,cargoReleaseStatusFilter,
+                     entrySummaryDelete,cargoReleaseDelete,releaseReason,multipleCargoDisposition,
+                     disSubmissionMade,replacementNo) -->
+  </portType>
+  <binding name="EntryUploadServiceBinding" type="tns:EntryUploadService">
+    <soap:binding style="rpc" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="uploadEntry">
+      <soap:operation soapAction=""/>
+      <input><soap:body namespace="http://www.netchb.com/" use="literal"/></input>
+      <output><soap:body namespace="http://www.netchb.com/" use="literal"/></output>
+    </operation>
+  </binding>
+  <service name="EntryUploadWebService">
+    <port binding="tns:EntryUploadServiceBinding" name="EntryUploadServicePort">
+      <soap:address location="https://www.netchb.com:443/main/services/entry/EntryUploadService"/>
+    </port>
+  </service>
+</definitions>
