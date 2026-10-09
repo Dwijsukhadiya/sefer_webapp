@@ -73,4 +73,4 @@ One `<invoice>` per source invoice. An HTS assistant backed by CROSS rulings. Sc
 
 ## Using AI
 
-I used Claude Code throughout: recon, reading the 6,700-line XSD, scaffolding, rules and tests. The full chat history is in the submission. The fixture the tests check against was hand-transcribed, not model-generated, so the model never grades its own work.
+I used AI assistants throughout: recon, reading the 6,700-line XSD, scaffolding, rules and tests. The full chat history is in the submission. The fixture the tests check against was hand-transcribed, not model-generated, so the model never grades its own work.

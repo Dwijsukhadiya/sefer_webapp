@@ -24,7 +24,7 @@ npm run dev                   # http://localhost:3000
 |---|---|
 | `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` | Either one. If both are set, Gemini is used unless `EXTRACT_PROVIDER=anthropic`. |
 | `GEMINI_MODEL` | Optional. Comma-separated models tried in order when one is overloaded, out of daily quota or unavailable. Default: `gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash`. Each has its own free-tier quota (20 requests a day), so the chain gives about 80. |
-| `ANTHROPIC_MODEL` | Optional (default `claude-sonnet-5-5`). |
+| `ANTHROPIC_MODEL` | Optional (default set in code). |
 | `VERIFY_MODEL` | Optional. A *different* model that re-reads bill, container and document numbers in parallel; disagreements become error findings. Off when unset (see "What it does not do"). |
 | `EXTRACT_PASSCODE` | Optional. If set, `/api/extract` requires this code (the UI asks for it); the sample shipment stays open. |
 
