@@ -83,3 +83,28 @@ describe("schema helpers", () => {
     expect(entityName("SHORT NAME LIMITED")).toBe("SHORT NAME LIMITED");
   });
 });
+
+describe("plain-language XSD errors", () => {
+  it("names the line and where to fix a missing tariff number", async () => {
+    const docs = structuredClone(shipment001);
+    docs[0].lineItems.forEach((l) => (l.hsCode = null));
+    const r = await buildEntry(docs, emptyBrokerInputs());
+    expect(r.xsdIssues.map((i) => i.message)).toEqual(
+      ["NB-T101", "NB-H205", "NB-C330", "W-B220", "NB-P118S"].map((sku) => `Line ${sku}: no tariff number. Enter its 10-digit HTS under Entry lines.`),
+    );
+    expect(r.xsdIssues[0].raw).toMatch(/Missing child element/);
+  });
+
+  it("explains a missing bill of lading without XML jargon", async () => {
+    const r = await buildEntry([structuredClone(shipment001[0])], emptyBrokerInputs());
+    expect(r.xsdIssues.map((i) => i.message)).toEqual([expect.stringMatching(/^No bill of lading or air waybill number/)]);
+  });
+
+  it("explains a malformed importer number", async () => {
+    const r = await buildEntry(shipment001, BrokerInputs.parse({}));
+    expect(r.xsdIssues).toEqual([]); // valid entry: nothing to explain
+    const { explainXsdErrors } = await import("../src/lib/netchb/explainXsd");
+    const raw = "line 9: Schemas validity error : Element '{http://www.netchb.com/xml/entry}importer-tax-id': [facet 'pattern'] The value '123' is not accepted by the pattern 'x'.";
+    expect(explainXsdErrors([raw], r.xml, r.facts)[0].message).toMatch(/Importer number "123" is not a valid IRS\/EIN/);
+  });
+});

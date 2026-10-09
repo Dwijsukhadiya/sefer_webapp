@@ -48,10 +48,12 @@ export const fibreContent: Rule = {
   description: "Fibre composition: invoice vs packing list",
   run: ({ docs, facts }) => {
     const out: Finding[] = [];
-    const inv = docsOf(docs, "commercial_invoice")[0];
+    const invoices = docsOf(docs, "commercial_invoice");
     const pl = docsOf(docs, "packing_list")[0];
-    if (!inv || !pl) return out;
+    if (!invoices.length || !pl) return out;
     for (const line of facts.lines) {
+      const inv = invoices[line.invoice ?? 0]; // the invoice this line came from
+      if (!inv) continue;
       const a = inv.lineItems.find((x) => normKey(x.styleOrSku) === normKey(line.sku));
       const b = pl.lineItems.find((x) => normKey(x.styleOrSku) && normKey(x.styleOrSku) === normKey(line.sku));
       const fa = parseFibre(a?.fibreOrMaterial ?? null), fb = parseFibre(b?.fibreOrMaterial ?? null);

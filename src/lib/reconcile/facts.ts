@@ -86,13 +86,19 @@ function collectManufacturers(docs: ExtractedDoc[], seller: PartyFact | null, or
 }
 
 function buildLines(invoices: ExtractedDoc[], packing: ExtractedDoc[], shipmentOrigin: string | null): EntryLine[] {
-  const base = invoices.flatMap((d) => d.lineItems);
+  const base = invoices.flatMap((d, invoice) => d.lineItems.map((li) => ({ li, invoice: invoice as number | null })));
   const plItems = packing.flatMap((d) => d.lineItems);
-  const primary = base.length ? base : plItems;
-  return primary.map((li, i) => {
+  const primary = base.length ? base : plItems.map((li) => ({ li, invoice: null }));
+  const seen = new Map<string, number>();
+  return primary.map(({ li, invoice }, i) => {
     const pl = base.length ? plItems.find((p) => normKey(p.styleOrSku) && normKey(p.styleOrSku) === normKey(li.styleOrSku)) : li;
+    // The same style on two invoices must not share a key (broker overrides are keyed by it).
+    const raw = li.styleOrSku ?? li.lineNo ?? `L${i + 1}`;
+    const n = (seen.get(raw) ?? 0) + 1;
+    seen.set(raw, n);
     return {
-      key: li.styleOrSku ?? li.lineNo ?? `L${i + 1}`,
+      key: n === 1 ? raw : `${raw}#${n}`,
+      invoice,
       lineNo: li.lineNo,
       sku: li.styleOrSku,
       description: li.description,
@@ -160,6 +166,7 @@ export function buildFacts(docs: ExtractedDoc[]): ShipmentFacts {
     currency: first(inv?.currency)?.toUpperCase() ?? null,
     incoterm: first(inv?.incoterm)?.toUpperCase() ?? null,
     invoiceNumber: first(inv?.documentNumber),
+    invoiceNumbers: invoices.map((d) => d.documentNumber),
     invoiceDate: invDate && invDate.candidates.length === 1 ? invDate.candidates[0] : null,
     poNumbers: [...new Set(docs.flatMap((d) => d.poNumbers))],
 
@@ -194,7 +201,9 @@ export function buildFacts(docs: ExtractedDoc[]): ShipmentFacts {
     freightCents: chargeSum("freight"),
     insuranceCents: chargeSum("insurance"),
     otherChargesCents: charges.filter((c) => !["freight", "insurance"].includes(c.kind)).reduce((a, c) => a + toCents(c.amount), 0),
-    invoiceTotalCents: inv?.totals.grandTotal == null ? null : toCents(inv.totals.grandTotal),
+    invoiceTotalCents: invoices.length && invoices.every((d) => d.totals.grandTotal !== null)
+      ? invoices.reduce((a, d) => a + toCents(d.totals.grandTotal!), 0)
+      : null,
     enteredValueCents: null,
     assistsCents: 0,
   };

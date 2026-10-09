@@ -140,3 +140,19 @@ export const FileExtraction = z.object({
 export type FileExtraction = z.infer<typeof FileExtraction>;
 
 export type ExtractedDoc = DocumentExtraction & { sourceFile: string };
+
+/**
+ * A second, independent read of the identifiers that are expensive to get wrong and hard to
+ * catch by cross-checking (a misread bill number fails cargo release). Compared with the main
+ * transcription in verify.ts.
+ */
+export const IdentifierRead = z.object({
+  documents: z.array(z.object({
+    docType: DocType,
+    documentNumber: z.string().nullable(),
+    houseBill: z.string().nullable(),
+    masterBill: z.string().nullable(),
+    containerNumbers: z.array(z.string()),
+  })),
+});
+export type IdentifierRead = z.infer<typeof IdentifierRead>;

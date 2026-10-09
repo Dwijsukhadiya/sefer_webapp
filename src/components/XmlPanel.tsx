@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState, type ReactNode } from "react";
+import type { XsdIssue } from "@/lib/netchb/explainXsd";
 import type { XsdResult } from "@/lib/netchb/validate";
 import { buttonCls, Card } from "./ui";
 
@@ -26,7 +27,7 @@ function highlight(line: string): ReactNode[] {
 }
 
 /** The NetCHB entry document, its XSD validation result, copy and download. */
-export function XmlPanel({ xml, xsd, fileName }: { xml: string; xsd: XsdResult; fileName: string }) {
+export function XmlPanel({ xml, xsd, issues, fileName }: { xml: string; xsd: XsdResult; issues: XsdIssue[]; fileName: string }) {
   const [copied, setCopied] = useState(false);
   const lines = useMemo(() => xml.split("\n"), [xml]);
 
@@ -78,9 +79,16 @@ export function XmlPanel({ xml, xsd, fileName }: { xml: string; xsd: XsdResult; 
       </div>
 
       {!xsd.valid && (
-        <ul className="mb-3 space-y-1 rounded-md border border-red-200 bg-red-50 p-2 font-mono text-[11px] text-red-700">
-          {xsd.errors.map((e) => <li key={e}>{e}</li>)}
-        </ul>
+        <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-3">
+          <p className="mb-1.5 text-xs font-semibold text-red-800">What to fix before this can be uploaded to NetCHB:</p>
+          <ul className="list-disc space-y-1 pl-4 text-sm text-red-800">
+            {issues.map((i, n) => <li key={n}>{i.message}</li>)}
+          </ul>
+          <details className="mt-2">
+            <summary className="cursor-pointer text-[11px] text-red-600">Validator output</summary>
+            <ul className="mt-1 space-y-1 font-mono text-[10px] text-red-700">{xsd.errors.map((e) => <li key={e}>{e}</li>)}</ul>
+          </details>
+        </div>
       )}
 
       <div className="xml-view max-h-[34rem] overflow-auto py-3 pr-4">

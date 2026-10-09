@@ -1,8 +1,10 @@
 import type { ExtractedDoc } from "../extract/schema";
 import { buildFacts } from "./facts";
 import { assists } from "./rules/assists";
+import { crossReferences } from "./rules/crossReferences";
 import { customsValue } from "./rules/customsValue";
 import { dates } from "./rules/dates";
+import { extractionUncertain } from "./rules/extractionUncertain";
 import { fibreContent } from "./rules/fibreContent";
 import { htsClassification } from "./rules/htsClassification";
 import { invoiceTotals } from "./rules/invoiceTotals";
@@ -42,6 +44,8 @@ export const RULES: Rule[] = [
   dates,
   marking,
   multipleInvoices,
+  extractionUncertain,
+  crossReferences,
 ];
 
 const RANK = { error: 0, warning: 1, info: 2 } as const;

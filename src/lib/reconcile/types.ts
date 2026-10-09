@@ -56,7 +56,8 @@ export interface ManufacturerFact extends PartyFact {
 }
 
 export interface EntryLine {
-  key: string; // style/SKU, else line number
+  key: string; // style/SKU, else line number; unique across the shipment
+  invoice: number | null; // index into invoiceNumbers; null when the line comes from a packing list only
   lineNo: string | null;
   sku: string | null;
   description: string;
@@ -93,7 +94,8 @@ export interface ShipmentFacts {
   mode: "ocean" | "air" | null;
   currency: string | null;
   incoterm: string | null;
-  invoiceNumber: string | null;
+  invoiceNumber: string | null; // the first invoice (header references)
+  invoiceNumbers: Array<string | null>; // every commercial invoice, in upload order
   invoiceDate: string | null; // ISO, null if unresolved
   poNumbers: string[];
 

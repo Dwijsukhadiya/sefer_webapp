@@ -33,7 +33,24 @@ export function DocumentViewer({ sources, docs, active, onSelect }: Props) {
 
   return (
     <section className="card flex h-full flex-col overflow-hidden">
-      <header className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
+      {/* Phones: inline PDF viewing is unreliable and eats the screen, so link out instead. */}
+      <div className="p-3 lg:hidden">
+        <h2 className="mb-2 text-[13px] font-semibold tracking-tight text-slate-900">Source documents</h2>
+        {sources.length ? (
+          <div className="flex flex-wrap gap-2">
+            {sources.map((s) => (
+              <a key={s.name} href={s.url} target="_blank" rel="noreferrer" title={s.name}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm">
+                {labelFor(s.name)} <span className="text-blue-600">↗</span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400">Upload documents to open them here.</p>
+        )}
+      </div>
+
+      <header className="hidden items-center gap-2 border-b border-slate-100 px-3 py-2 lg:flex">
         <h2 className="mr-1 shrink-0 text-[13px] font-semibold tracking-tight text-slate-900">Source documents</h2>
         <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto" role="tablist">
           {sources.map((s) => (
@@ -57,7 +74,7 @@ export function DocumentViewer({ sources, docs, active, onSelect }: Props) {
           </a>
         )}
       </header>
-      <div className="relative min-h-0 flex-1 bg-slate-100">
+      <div className="relative hidden min-h-0 flex-1 bg-slate-100 lg:block">
         {!current ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-sm text-slate-400">
             Upload documents to see them here, side by side with what was extracted.

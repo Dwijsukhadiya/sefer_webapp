@@ -16,7 +16,13 @@ const Body = z.object({
  * Pure and deterministic: no model call, so every UI edit rebuilds the entry instantly.
  */
 export async function POST(req: Request) {
-  const parsed = Body.safeParse(await req.json());
+  let json: unknown;
+  try {
+    json = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Request body must be JSON: { documents: [...], brokerInputs?: {...} }." }, { status: 400 });
+  }
+  const parsed = Body.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: z.prettifyError(parsed.error) }, { status: 400 });
   const broker = parsed.data.brokerInputs ?? BrokerInputs.parse({});
   return NextResponse.json(await buildEntry(parsed.data.documents, broker));

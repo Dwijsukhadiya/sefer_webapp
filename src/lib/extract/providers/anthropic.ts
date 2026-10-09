@@ -1,8 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { EXTRACTION_SYSTEM, EXTRACTION_USER, retryText } from "../prompt";
+import { retryText } from "../prompt";
 import type { ExtractionProvider, UploadedFile } from "./types";
-
-const TOOL_NAME = "record_documents";
 
 function contentFor(file: UploadedFile): Anthropic.ContentBlockParam {
   if (file.mediaType === "application/pdf") {
@@ -11,21 +9,21 @@ function contentFor(file: UploadedFile): Anthropic.ContentBlockParam {
   return { type: "image", source: { type: "base64", media_type: file.mediaType as "image/png" | "image/jpeg" | "image/webp", data: file.base64 } };
 }
 
-/** Claude with native PDF input, forced to answer through a tool whose input schema is our Zod schema. */
-export function anthropicProvider(inputSchema: object, model = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5-5"): ExtractionProvider {
+/** Claude with native PDF input, forced to answer through a tool whose input schema is the task's schema. */
+export function anthropicProvider(model = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5-5"): ExtractionProvider {
   const client = new Anthropic();
   return {
     name: `anthropic:${model}`,
-    async transcribe(file, retryFeedback) {
+    async transcribe(file, task, retryFeedback) {
       const res = await client.messages.create({
         model,
         max_tokens: 16000,
-        system: EXTRACTION_SYSTEM,
-        tools: [{ name: TOOL_NAME, description: "Record the transcribed documents.", input_schema: inputSchema as Anthropic.Tool.InputSchema }],
-        tool_choice: { type: "tool", name: TOOL_NAME },
+        system: task.system,
+        tools: [{ name: task.name, description: "Record what the file says.", input_schema: task.jsonSchema as Anthropic.Tool.InputSchema }],
+        tool_choice: { type: "tool", name: task.name },
         messages: [{
           role: "user",
-          content: [contentFor(file), { type: "text", text: retryFeedback ? `${EXTRACTION_USER}\n\n${retryText(retryFeedback)}` : EXTRACTION_USER }],
+          content: [contentFor(file), { type: "text", text: retryFeedback ? `${task.user}\n\n${retryText(retryFeedback)}` : task.user }],
         }],
       });
       const call = res.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");

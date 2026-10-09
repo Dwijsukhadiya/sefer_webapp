@@ -16,24 +16,26 @@ npm run dev                   # http://localhost:3000
 ```
 
 - **No API key?** Click **Use sample shipment** (or open `/?sample`). It loads the hand-transcribed extraction of the three sample PDFs, and everything after extraction runs normally.
-- `npm test` runs 62 Vitest tests: the 11 sample traps, XSD validation, MID rules, the extraction retry loop, 7 shipment variants the app has never seen, regression cases taken from real model output, the PGA scan, and the audit trail.
+- `npm test` runs 92 Vitest tests: the 11 sample traps, XSD validation, MID rules, the extraction retry loop, Gemini quota/fallback handling, the API routes, 7 shipment variants the app has never seen, regression cases taken from real model output, multi-invoice entries, cross-document checks, the PGA scan, and the audit trail.
 - `npx tsx scripts/generate-sample.ts` regenerates the committed sample output.
 - `npx tsx scripts/eval-extraction.ts` runs the real model on the sample PDFs and scores it field by field against the fixture. It needs a key.
 
 | Env var | Purpose |
 |---|---|
 | `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` | Either one. If both are set, Gemini is used unless `EXTRACT_PROVIDER=anthropic`. |
-| `GEMINI_MODEL`, `ANTHROPIC_MODEL` | Optional model override (defaults: `gemini-3.8-flash`, `claude-sonnet-5-5`). |
+| `GEMINI_MODEL` | Optional. Comma-separated models tried in order when one is overloaded, out of daily quota or unavailable. Default: `gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash`. Each has its own free-tier quota (20 requests a day), so the chain gives about 80. |
+| `ANTHROPIC_MODEL` | Optional (default `claude-sonnet-5-5`). |
+| `VERIFY_MODEL` | Optional. A *different* model that re-reads bill, container and document numbers in parallel; disagreements become error findings. Off when unset (see "What it does not do"). |
+| `EXTRACT_PASSCODE` | Optional. If set, `/api/extract` requires this code (the UI asks for it); the sample shipment stays open. |
 
 ### Deploy
 
 Deploy to Vercel: `npx vercel`. No configuration is needed beyond the environment variable (`GEMINI_API_KEY` or `ANTHROPIC_API_KEY`). `next.config.ts` already ships the XSDs and the xmllint WASM binary with the `/api/entry` function.
 
-Two platform limits to know about:
-- Vercel caps a function's request body at about 4.5 MB, so very large scans should be compressed or uploaded one file at a time.
-- `/api/extract` asks for up to 120 s (`maxDuration`), which needs a plan that allows it.
-
-The sample shipment's PDFs (~470 KB total) are well within both limits.
+Platform limits, and how the app handles them:
+- **Upload size.** Vercel refuses request bodies over about 4.5 MB. The browser therefore uploads one file per request, in parallel. Any single file over 4.4 MB is refused before upload, with the reason.
+- **Time.** `/api/extract` asks for up to 120 s per file (`maxDuration`).
+- **Gemini free tier.** The limit is 20 requests per model per day. A used-up model is skipped instantly. When every model is used up, the app says so and when it resets, and the sample shipment keeps working.
 
 ## How it works
 
@@ -77,6 +79,9 @@ Adding a rule means one file in `src/lib/reconcile/rules/`, one line in `src/lib
   - the corrections the rules applied (each with its evidence), separated from the issues still open;
   - the exact XML, its XSD result, and the SHA-256 of the schema used;
   - SHA-256 hashes of the source files and the XML.
+- **Fix-it guidance, not validator jargon.** When the XML fails the XSD, each error is translated into what is missing and where to fix it (for example "Line NB-T101: no tariff number. Enter its 10-digit HTS under Entry lines"). The raw validator output stays one click away.
+- **Reading confidence is visible.** Fields the model marked as hard to read become findings. Numbers printed on two documents are compared: the B/L number on the invoice against the B/L, and invoice numbers on the B/L or packing list against the invoices. A mismatch shows both readings, and the app never picks one.
+- **Several invoices per shipment.** Each invoice is checked against its own subtotal and total, and entered as its own `<invoice>`.
 - **Graceful degradation.** Each panel has its own React error boundary. If an unusual document breaks one section's rendering, that section shows what failed and offers a retry; the rest of the entry keeps working. Boundaries reset when the entry is rebuilt.
 
 ## How NetCHB was tracked down
@@ -100,6 +105,7 @@ The brief gave no link. The full trail, with dead ends, is in [`schemas/SOURCE.m
 - **The audit file is a supporting record, not the entry record itself.** The commercial documents and the filed entry are what 19 CFR 163 requires you to keep; the audit trail explains how this entry was prepared from them.
 - **The MID is built from CBP's published rules, not looked up.** Ambiguous addresses (e.g. "Lot C7-C8") are flagged for checking against the broker's NetCHB manufacturer table.
 - **The importer of record is proposed, never decided silently.** The buyer is preferred over a 3PL consignee, and the choice is flagged and switchable.
-- **One `<invoice>` per entry.** With several invoices, lines are merged and a warning says so.
+- **Valuation assumes one currency and one set of terms.** Several invoices are each reconciled and entered separately, but if their currency or Incoterm differ, a warning says the first one was used for valuation.
+- **The master bill is only verified if you pay for it.** It appears only on the B/L, so no cross-document check can catch a misread. Tested live, a second read by the same model repeated the same dropped digit, so the check is off unless `VERIFY_MODEL` names a different model.
 - **Untested against a live NetCHB account.** Passing the XSD is necessary, not sufficient: NetCHB and CBP enforce business rules the schema does not express.
 - **Small code tables.** Port codes, countries and package units cover common cases. Anything unknown becomes a finding, not a guess. Schedule K foreign port codes are not mapped.

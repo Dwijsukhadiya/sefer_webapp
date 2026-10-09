@@ -58,6 +58,15 @@ Building it surfaced a real provenance bug: git's Windows line-ending conversion
 
 Finally, each panel has its own error boundary, so an odd document that breaks one view degrades that panel, not the whole screen.
 
+## Testing the live deployment
+
+I tested the deployed app the way a grader would: the sample, twelve shipment variants (with live results byte-identical to local), a single combined PDF, a phone photo, junk files, and oversized uploads. That surfaced issues no unit test had:
+- Two correct invoices were reported as arithmetic *errors*, because every line was checked against the first invoice's totals. Now each invoice is reconciled and entered on its own.
+- A 5 MB scan produced a cryptic JSON parse error. Now uploads go one file per request, and oversized files are refused up front with the reason.
+- The free Gemini tier allows 20 requests per model per day, and it ran out mid-test. Quota exhaustion is now recognised, skipped past model by model, and explained to the broker.
+
+One idea failed when tested, and I kept the lesson. To catch misread bill numbers I added a second, focused read of the identifiers. Live, both reads dropped the *same* digit from the master bill. Two reads by one model are not independent, and the check doubled quota use. So it is now opt-in with a *different* model. The free default is a deterministic check instead: numbers printed on two documents (the B/L number on the invoice, invoice numbers on the B/L) must agree.
+
 ## With more time
 
 One `<invoice>` per source invoice. An HTS assistant backed by CROSS rulings. Schedule D/K tables loaded from CBP. NetCHB `ManufacturerService` lookup for MIDs. A real `uploadEntry` call behind broker credentials. Broker corrections fed back as extraction examples.

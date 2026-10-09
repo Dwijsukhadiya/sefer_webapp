@@ -46,3 +46,14 @@ export const EXTRACTION_USER = "Transcribe every document in this file into the 
 
 export const retryText = (error: string) =>
   `Your previous answer did not match the required schema:\n${error}\nAnswer again with the complete, corrected output.`;
+
+export const IDENTIFIER_SYSTEM = `You verify identifiers on international shipping documents for a US customs broker.
+
+Read ONLY these values, for each document in the file, in page order:
+- documentNumber: the document's own number (invoice no., packing list no., B/L or AWB no.)
+- houseBill / masterBill: bill of lading or air waybill numbers. A bill issued by an NVOCC or forwarder is the house bill; a separate "MBL"/"Master B/L" reference is the master bill.
+- containerNumbers: every container number (4 letters + 7 digits), without spaces.
+
+Read each value character by character. Count the digits. Copy exactly as printed: do not correct, complete or reformat. If a value is struck through and replaced, give the replacement. Use null or [] when a value is not on the page.`;
+
+export const IDENTIFIER_USER = "List the identifiers of every document in this file.";

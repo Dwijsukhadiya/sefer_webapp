@@ -93,6 +93,12 @@ const note = (id: string, field: string, title: string, detail: string, resoluti
   id, severity: "info", category: "filing", field, title, detail, evidence: [], resolution, autoApplied: true,
 });
 
+/** The order lines appear in the XML: grouped by source invoice (packing-list-only lines join the first). */
+export function xmlLineOrder(f: ShipmentFacts): EntryLine[] {
+  const count = Math.max(1, f.invoiceNumbers.length);
+  return Array.from({ length: count }, (_, i) => f.lines.filter((l) => (l.invoice ?? 0) === i)).flat();
+}
+
 export function mapEntry(f: ShipmentFacts, b: BrokerInputs): MappedEntry {
   const notes: Finding[] = [];
 
@@ -208,15 +214,17 @@ export function mapEntry(f: ShipmentFacts, b: BrokerInputs): MappedEntry {
   }
 
   // ---- invoice + lines -----------------------------------------------------
-  const invoiceNo = f.invoiceNumber ? xmlInvoiceNo(f.invoiceNumber) : undefined;
-  if (f.invoiceNumber && invoiceNo !== f.invoiceNumber) {
+  // One <invoice> per commercial invoice. Lines known only from a packing list join the first.
+  const sourceInvoices = f.invoiceNumbers.length ? f.invoiceNumbers : [f.invoiceNumber];
+  const renamed = sourceInvoices.filter((n): n is string => !!n && xmlInvoiceNo(n) !== n);
+  if (renamed.length) {
     notes.push(note("XML_INVOICE_NO_NORMALISED", "invoice.invoice-no",
-      `Invoice number "${f.invoiceNumber}" entered as "${invoiceNo}"`,
+      renamed.map((n) => `Invoice number "${n}" entered as "${xmlInvoiceNo(n)}"`).join("; "),
       "entry.xsd allows only letters, digits and hyphens in an invoice number (max 17), so the other characters were removed.",
       "Broker should confirm this matches how the invoice is referenced in their records."));
   }
 
-  const lineItems: XmlNode[] = f.lines.map((l) => {
+  const lineItem = (l: EntryLine): XmlNode => {
     const mfr = f.manufacturers.find((m) => m.key === l.manufacturerKey);
     return {
       "export-date": f.exportDate ?? undefined,
@@ -235,7 +243,7 @@ export function mapEntry(f: ShipmentFacts, b: BrokerInputs): MappedEntry {
       "invoice-quantity": l.quantity !== null ? String(l.quantity) : undefined,
       "po-number": f.poNumbers[0],
     };
-  });
+  };
   const assisted = f.lines.filter((l) => l.assistCents > 0);
   if (assisted.length) {
     notes.push(note("XML_ASSIST_IN_LINE_VALUE", "invoice.line-items.tariff.value",
@@ -251,11 +259,11 @@ export function mapEntry(f: ShipmentFacts, b: BrokerInputs): MappedEntry {
       "Broker must classify each line to 10 digits (enter them in the HTS fields)."));
   }
 
-  const invoice: XmlNode = {
-    "invoice-no": invoiceNo,
+  const invoices: XmlNode[] = sourceInvoices.map((number, index) => ({
+    "invoice-no": number ? xmlInvoiceNo(number) : undefined,
     "foreign-currency": f.currency && f.currency !== "USD" ? { "currency-code": f.currency } : undefined,
-    "line-items": { "line-item": lineItems },
-  };
+    "line-items": { "line-item": f.lines.filter((l) => (l.invoice ?? 0) === index).map(lineItem) },
+  }));
 
   // Root children must follow the xsd:sequence order exactly.
   const tree: XmlNode = {
@@ -265,7 +273,7 @@ export function mapEntry(f: ShipmentFacts, b: BrokerInputs): MappedEntry {
     manifest,
     containers,
     "ace-cargo-release-parties": parties.length ? { entity: parties } : undefined,
-    invoices: { invoice: [invoice] },
+    invoices: { invoice: invoices },
   };
   return { tree, notes };
 }

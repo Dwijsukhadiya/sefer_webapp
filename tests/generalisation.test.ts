@@ -112,14 +112,56 @@ describe("variant: the seller is the factory", () => {
 });
 
 describe("variant: two invoices in one shipment", () => {
-  it("keeps every line and warns that totals were only checked against the first", async () => {
+  /** Two invoices, each internally consistent: A is the clean sample (3 lines), B has one line. */
+  function twoInvoices() {
     const a = cleanInvoice();
     const b = clone(a);
     b.documentNumber = "KBAS/NB/26-0913";
     b.lineItems = [{ ...a.lineItems[0], styleOrSku: "NB-T102", lineNo: "1" }];
+    b.charges = [];
+    b.totals.subtotal = 6840;
+    b.totals.grandTotal = 6840;
+    return { a, b };
+  }
+
+  it("checks each invoice against its own totals: no false subtotal/total errors", async () => {
+    const { a, b } = twoInvoices();
     const r = await buildEntry([a, b, billOfLading], emptyBrokerInputs());
-    expect(ids(r)).toContain("MULTIPLE_INVOICES");
+    expect(ids(r)).not.toContain("INVOICE_SUBTOTAL_MISMATCH");
+    expect(ids(r)).not.toContain("INVOICE_TOTAL_MISMATCH");
+    expect(r.findings.find((f) => f.id === "MULTIPLE_INVOICES")!.severity).toBe("info");
     expect(r.facts.lines).toHaveLength(4);
+  });
+
+  it("emits one <invoice> per source invoice, each with its own lines", async () => {
+    const { a, b } = twoInvoices();
+    const r = await buildEntry([a, b, billOfLading], emptyBrokerInputs());
+    expect(tag(r.xml, "invoice-no")).toEqual(["KBASNB26-0912", "KBASNB26-0913"]);
+    const second = r.xml.slice(r.xml.lastIndexOf("<invoice>"));
+    expect(tag(second, "value")).toEqual(["6840.00"]);
+    expect(r.xsd.errors).toEqual([]);
+  });
+
+  it("still catches a real total error, and says which invoice", async () => {
+    const { a, b } = twoInvoices();
+    b.totals.grandTotal = 7000;
+    const f = (await buildEntry([a, b, billOfLading], emptyBrokerInputs())).findings.find((x) => x.id === "INVOICE_TOTAL_MISMATCH")!;
+    expect(f.title).toMatch(/KBAS\/NB\/26-0913/);
+  });
+
+  it("warns when the invoices disagree on currency", async () => {
+    const { a, b } = twoInvoices();
+    b.currency = "EUR";
+    const f = (await buildEntry([a, b, billOfLading], emptyBrokerInputs())).findings.find((x) => x.id === "MULTIPLE_INVOICES")!;
+    expect(f.severity).toBe("warning");
+    expect(f.title).toMatch(/currency/);
+  });
+
+  it("gives the same style on two invoices distinct line keys", async () => {
+    const { a, b } = twoInvoices();
+    b.lineItems[0].styleOrSku = "NB-T101";
+    const keys = (await buildEntry([a, b, billOfLading], emptyBrokerInputs())).facts.lines.map((l) => l.key);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
 
@@ -175,5 +217,30 @@ describe("model output: a generic description recorded as the manufacturer", () 
     pl.parties = pl.parties.filter((p) => !(p.role === "manufacturer" && /SAIGON/i.test(p.name)));
     const r = await buildEntry([inv, pl, billOfLading], emptyBrokerInputs());
     expect(tag(r.xml, "manufacturer-id")).toEqual(["VNSAIPHO78DIA", "VNSAIPHO78DIA", "VNSAIPHO78DIA", "VNSAIPHO78DIA", "BDSPGAR41GAZ"]);
+  });
+});
+
+describe("cross-document identifiers (free misread check)", () => {
+  it("stays quiet when the invoice's B/L No. matches the B/L", async () => {
+    const r = await buildEntry([clone(invoice), packingList, billOfLading], emptyBrokerInputs());
+    expect(ids(r)).not.toContain("BILL_REFERENCE_MISMATCH");
+    expect(ids(r)).not.toContain("INVOICE_REFERENCE_MISMATCH");
+  });
+
+  it("flags a misread house bill with both readings, choosing neither", async () => {
+    const bl = clone(billOfLading);
+    bl.houseBill = "BMLVHCM2609418"; // a dropped digit, like the live master-bill misread
+    const r = await buildEntry([clone(invoice), packingList, bl], emptyBrokerInputs());
+    const f = r.findings.find((x) => x.id === "BILL_REFERENCE_MISMATCH")!;
+    expect(f.severity).toBe("error");
+    expect(f.title).toMatch(/BMLVHCM26090418.*BMLVHCM2609418/);
+    expect(r.facts.houseBill).toBe("BMLVHCM2609418"); // reported, not silently "fixed"
+  });
+
+  it("notices an invoice that the B/L mentions but nobody uploaded", async () => {
+    const bl = clone(billOfLading);
+    bl.invoiceNumbers = ["KBAS/NB/26-0912", "KBAS/NB/26-0950"];
+    const f = (await buildEntry([clone(invoice), bl], emptyBrokerInputs())).findings.find((x) => x.id === "INVOICE_REFERENCE_MISMATCH")!;
+    expect(f.title).toMatch(/26-0950/);
   });
 });

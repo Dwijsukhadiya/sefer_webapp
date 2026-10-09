@@ -140,7 +140,7 @@ export default function Home() {
         {result && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
             {/* Left: the source document, always in view while reviewing on the right. */}
-            <aside id="viewer" className="h-[70vh] scroll-mt-16 lg:sticky lg:top-14 lg:col-span-5 lg:h-[calc(100vh-4.5rem)]">
+            <aside id="viewer" className="scroll-mt-16 lg:sticky lg:top-14 lg:col-span-5 lg:h-[calc(100vh-4.5rem)]">
               <ErrorBoundary section="Source documents" resetKey={result}><DocumentViewer sources={sources} docs={docs} active={activeFile} onSelect={setActiveFile} /></ErrorBoundary>
             </aside>
 
@@ -153,7 +153,7 @@ export default function Home() {
               </div>
               <ErrorBoundary section="Entry lines" resetKey={result}><EntryLines facts={result.facts} broker={broker} onBroker={setBroker} /></ErrorBoundary>
               <div id="xml" className="scroll-mt-16">
-                <ErrorBoundary section="NetCHB XML" resetKey={result}><XmlPanel xml={result.xml} xsd={result.xsd} fileName={fileName} /></ErrorBoundary>
+                <ErrorBoundary section="NetCHB XML" resetKey={result}><XmlPanel xml={result.xml} xsd={result.xsd} issues={result.xsdIssues} fileName={fileName} /></ErrorBoundary>
               </div>
               <ErrorBoundary section="Audit trail" resetKey={result}><AuditPanel extractedByModel={extracted} reviewed={docs} broker={broker} result={result} sources={sources} /></ErrorBoundary>
               <ErrorBoundary section="Extracted documents" resetKey={result}><DocumentsPanel docs={docs} onChange={setDocs} activeFile={activeFile} onView={viewFile} /></ErrorBoundary>
