@@ -43,3 +43,6 @@ tsconfig.tsbuildinfo
 next-env.d.ts
 
 # Graded deliverables live in output/ and MUST stay tracked; do not ignore that folder.
+
+# scratch scripts
+scripts/.tmp/
