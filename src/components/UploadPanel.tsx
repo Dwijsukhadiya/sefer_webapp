@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
 import type { ExtractedDoc } from "@/lib/extract/schema";
+import { sampleSources, type SourceFile } from "./DocumentViewer";
 import { buttonCls, Card, primaryCls, Spinner } from "./ui";
 
 interface Props {
   docs: ExtractedDoc[];
-  onDocs: (docs: ExtractedDoc[]) => void;
+  onDocs: (docs: ExtractedDoc[], sources: SourceFile[]) => void;
 }
 
 const DOC_CHIP: Record<string, { icon: string; label: string }> = {
@@ -42,7 +43,10 @@ export function UploadPanel({ docs, onDocs }: Props) {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? res.statusText);
       setErrors((body.errors ?? []).map((e: { file: string; error: string }) => `${e.file}: ${e.error}`));
-      if (body.documents?.length) onDocs(body.documents);
+      if (body.documents?.length) {
+        const sources = files.map((f) => ({ name: f.name, url: URL.createObjectURL(f), mediaType: f.type || (f.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/png") }));
+        onDocs(body.documents, sources);
+      }
     } catch (e) {
       setErrors([e instanceof Error ? e.message : String(e)]);
     } finally {
@@ -53,7 +57,7 @@ export function UploadPanel({ docs, onDocs }: Props) {
   async function sample() {
     setBusy("sample");
     const body = await (await fetch("/api/sample")).json();
-    onDocs(body.documents);
+    onDocs(body.documents, sampleSources(body.documents));
     setBusy(null);
   }
 

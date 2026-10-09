@@ -1,0 +1,15 @@
+# Source files: LF everywhere, whatever the OS's autocrlf setting.
+* text=auto eol=lf
+
+# Provenance-pinned files must keep their exact bytes: schemas/SOURCE.md publishes their
+# SHA-256, and the audit trail records it. Never let git rewrite their line endings.
+schemas/*.xsd -text
+schemas/*.wsdl -text
+output/* -text
+
+# Binary documents
+*.pdf binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.wasm binary

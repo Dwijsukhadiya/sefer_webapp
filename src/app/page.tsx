@@ -1,8 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
+import { AuditPanel } from "@/components/AuditPanel";
 import { BrokerForm } from "@/components/BrokerForm";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
+import { DocumentViewer, sampleSources, type SourceFile } from "@/components/DocumentViewer";
 import { EntryLines } from "@/components/EntryLines";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { UploadPanel } from "@/components/UploadPanel";
 import { Spinner } from "@/components/ui";
@@ -15,15 +18,34 @@ type StepState = "done" | "attention" | "pending";
 
 export default function Home() {
   const [docs, setDocs] = useState<ExtractedDoc[]>([]);
+  const [extracted, setExtracted] = useState<ExtractedDoc[]>([]); // as the model returned them, before any edit
   const [broker, setBroker] = useState<BrokerInputs>(() => BrokerInputs.parse({}));
   const [result, setResult] = useState<EntryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
+  const [sources, setSources] = useState<SourceFile[]>([]);
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+
+  // New documents replace the old ones; release the old upload blobs.
+  const loadDocs = (d: ExtractedDoc[], s: SourceFile[]) => {
+    setSources((old) => {
+      old.filter((o) => o.url.startsWith("blob:")).forEach((o) => URL.revokeObjectURL(o.url));
+      return s;
+    });
+    setActiveFile(s[0]?.name ?? null);
+    setExtracted(d);
+    setDocs(d);
+    setResult(null);
+  };
+  const viewFile = (name: string) => {
+    setActiveFile(name);
+    document.getElementById("viewer")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
 
   // /?sample opens straight onto the sample shipment (demos, screenshots).
   useEffect(() => {
     if (!new URLSearchParams(window.location.search).has("sample")) return;
-    fetch("/api/sample").then((r) => r.json()).then((b) => setDocs(b.documents));
+    fetch("/api/sample").then((r) => r.json()).then((b) => loadDocs(b.documents, sampleSources(b.documents)));
   }, []);
 
   // Any edit to the documents or broker inputs rebuilds the entry. No model call happens here.
@@ -52,6 +74,7 @@ export default function Home() {
     return () => { clearTimeout(t); ctrl.abort(); };
   }, [docs, broker]);
 
+  const width = result ? "max-w-[1680px]" : "max-w-7xl"; // the split view needs the room
   const fileName = `${result?.facts.houseBill ?? result?.facts.invoiceNumber?.replace(/[^A-Za-z0-9-]/g, "") ?? "entry"}-netchb.xml`;
 
   const openRequired = result?.missing.filter((m) => m.required).length ?? 0;
@@ -66,7 +89,7 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <header className="bg-[var(--navy-900)] text-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+        <div className={`mx-auto flex ${width} flex-wrap items-center justify-between gap-3 px-4 py-4`}>
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-900/40">
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -88,7 +111,7 @@ export default function Home() {
       </header>
 
       <nav className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/85 backdrop-blur" aria-label="Progress">
-        <ol className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-4 py-2">
+        <ol className={`mx-auto flex ${width} items-center gap-1 overflow-x-auto px-4 py-2`}>
           {steps.map((s, i) => (
             <li key={s.id} className="flex shrink-0 items-center gap-1">
               {i > 0 && <span className={`mx-1 h-px w-6 sm:w-10 ${s.state === "pending" ? "bg-slate-200" : "bg-blue-300"}`} />}
@@ -108,26 +131,32 @@ export default function Home() {
         </ol>
       </nav>
 
-      <main className="mx-auto max-w-7xl space-y-4 px-4 py-5">
+      <main className={`mx-auto ${width} space-y-4 px-4 py-5`}>
         <div id="documents" className="scroll-mt-16">
-          <UploadPanel docs={docs} onDocs={(d) => { setDocs(d); setResult(null); }} />
+          <UploadPanel docs={docs} onDocs={loadDocs} />
         </div>
         {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
         {result && (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-            <div id="findings" className="min-w-0 scroll-mt-16 space-y-4 lg:col-span-2">
-              <FindingsPanel findings={result.findings} />
-            </div>
-            <div className="min-w-0 space-y-4 lg:col-span-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+            {/* Left: the source document, always in view while reviewing on the right. */}
+            <aside id="viewer" className="h-[70vh] scroll-mt-16 lg:sticky lg:top-14 lg:col-span-5 lg:h-[calc(100vh-4.5rem)]">
+              <ErrorBoundary section="Source documents" resetKey={result}><DocumentViewer sources={sources} docs={docs} active={activeFile} onSelect={setActiveFile} /></ErrorBoundary>
+            </aside>
+
+            <div className="min-w-0 space-y-4 lg:col-span-7">
+              <div id="findings" className="scroll-mt-16">
+                <ErrorBoundary section="Findings" resetKey={result}><FindingsPanel findings={result.findings} onViewFile={viewFile} /></ErrorBoundary>
+              </div>
               <div id="broker" className="scroll-mt-16">
-                <BrokerForm value={broker} onChange={setBroker} facts={result.facts} missing={result.missing} />
+                <ErrorBoundary section="Broker inputs" resetKey={result}><BrokerForm value={broker} onChange={setBroker} facts={result.facts} missing={result.missing} /></ErrorBoundary>
               </div>
-              <EntryLines facts={result.facts} broker={broker} onBroker={setBroker} />
+              <ErrorBoundary section="Entry lines" resetKey={result}><EntryLines facts={result.facts} broker={broker} onBroker={setBroker} /></ErrorBoundary>
               <div id="xml" className="scroll-mt-16">
-                <XmlPanel xml={result.xml} xsd={result.xsd} fileName={fileName} />
+                <ErrorBoundary section="NetCHB XML" resetKey={result}><XmlPanel xml={result.xml} xsd={result.xsd} fileName={fileName} /></ErrorBoundary>
               </div>
-              <DocumentsPanel docs={docs} onChange={setDocs} />
+              <ErrorBoundary section="Audit trail" resetKey={result}><AuditPanel extractedByModel={extracted} reviewed={docs} broker={broker} result={result} sources={sources} /></ErrorBoundary>
+              <ErrorBoundary section="Extracted documents" resetKey={result}><DocumentsPanel docs={docs} onChange={setDocs} activeFile={activeFile} onView={viewFile} /></ErrorBoundary>
             </div>
           </div>
         )}

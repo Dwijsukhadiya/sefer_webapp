@@ -5,6 +5,8 @@ import { Badge, Card, inputCls } from "./ui";
 interface Props {
   docs: ExtractedDoc[];
   onChange: (docs: ExtractedDoc[]) => void;
+  activeFile: string | null;
+  onView: (file: string) => void;
 }
 
 const DOC_LABEL: Record<string, string> = {
@@ -17,7 +19,7 @@ type NumKey = "quantity" | "unitPrice" | "amount";
  * What the model read, exactly as printed. Fix a misread here and everything downstream
  * (findings, values, XML) is recomputed without calling the model again.
  */
-export function DocumentsPanel({ docs, onChange }: Props) {
+export function DocumentsPanel({ docs, onChange, activeFile, onView }: Props) {
   const patchLine = (d: number, i: number, k: NumKey | "hsCode", raw: string) => {
     const next = structuredClone(docs);
     const line: LineItem = next[d].lineItems[i];
@@ -40,6 +42,15 @@ export function DocumentsPanel({ docs, onChange }: Props) {
               <span className="text-xs text-slate-400">· {doc.sourceFile}</span>
               {doc.uncertain.length > 0 && <Badge tone="amber">{doc.uncertain.length} uncertain</Badge>}
               {doc.amendments.length > 0 && <Badge tone="red">{doc.amendments.length} amended</Badge>}
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); onView(doc.sourceFile); }}
+                className={`ml-auto rounded-md px-2 py-0.5 text-[11px] font-medium transition ${
+                  activeFile === doc.sourceFile ? "bg-slate-900 text-white" : "text-blue-600 ring-1 ring-blue-200 hover:bg-blue-50"
+                }`}
+              >
+                {activeFile === doc.sourceFile ? "Viewing" : "View source"}
+              </button>
             </summary>
             <div className="finding-body space-y-3 border-t border-slate-100 px-3 py-3 text-xs">
               <dl className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">

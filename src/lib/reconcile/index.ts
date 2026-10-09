@@ -14,6 +14,7 @@ import { noCommercialValue } from "./rules/noCommercialValue";
 import { packagesAndWeight } from "./rules/packagesAndWeight";
 import { packingMath } from "./rules/packingMath";
 import { parties } from "./rules/parties";
+import { pgaDetection } from "./rules/pgaDetection";
 import { quantityByStyle } from "./rules/quantityByStyle";
 import { transport } from "./rules/transport";
 import type { Finding, Rule, ShipmentFacts } from "./types";
@@ -35,6 +36,7 @@ export const RULES: Rule[] = [
   customsValue, // after arithmetic + assists
   fibreContent,
   htsClassification,
+  pgaDetection,
   parties,
   transport,
   dates,

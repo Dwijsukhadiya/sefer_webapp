@@ -42,6 +42,22 @@ Running real extraction (Gemini) on the three sample PDFs scored 97–98% field 
 
 Each is fixed, and pinned by a test built from the real output. The model's answers also vary between runs, which is exactly why the deterministic layer guards against plausible extraction shapes rather than trusting one.
 
+## Built for how a broker actually works
+
+A broker's job is verification, and their liability is the record. So the review screen keeps the source document beside the data. Every piece of quoted evidence links back to the page it came from, so checking an extracted value takes one click, not a hunt through a PDF viewer.
+
+Customs is not only tariffs. A line can also need FDA, FCC, EPA or other agency data. CBP decides that from the 10-digit HTS number, which these documents don't carry. So the app gives an early warning from the goods description. It names the agency, the word that triggered it, and the `entry.xsd` block where the data is filed or disclaimed. It is explicit that this is a hint, not a determination. On the sample it stays silent, which is right for adult apparel. I tuned it against apparel false positives ("ivory" is a colour, faux fur is not wildlife).
+
+Brokers must keep entry records for five years (19 CFR 163.4), and when CBP asks why an entry was filed a certain way, the answer has to be on paper. The audit export records:
+- what the model read, and every manual edit as an exact before/after;
+- each correction the rules made, with its evidence, kept separate from the issues still open;
+- the final XML;
+- hashes tying the record to the specific source files and schema.
+
+Building it surfaced a real provenance bug: git's Windows line-ending conversion had silently rewritten the "byte-for-byte" schema copy. A `.gitattributes` now pins those bytes, and a test checks the schema hash on every run.
+
+Finally, each panel has its own error boundary, so an odd document that breaks one view degrades that panel, not the whole screen.
+
 ## With more time
 
 One `<invoice>` per source invoice. An HTS assistant backed by CROSS rulings. Schedule D/K tables loaded from CBP. NetCHB `ManufacturerService` lookup for MIDs. A real `uploadEntry` call behind broker credentials. Broker corrections fed back as extraction examples.

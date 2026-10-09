@@ -21,6 +21,7 @@ export type FindingCategory =
   | "dates"
   | "marking"
   | "completeness"
+  | "pga" // partner government agencies (FDA, FCC, EPA, ...)
   | "filing"; // how a fact was fitted into the NetCHB schema
 
 export interface Finding {

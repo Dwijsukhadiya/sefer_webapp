@@ -19,7 +19,7 @@ const FILTERS: Array<{ key: Filter; label: string; dot: string }> = [
 const kind = (f: Finding): Filter => (f.category === "filing" ? "filing" : f.severity);
 
 /** Every discrepancy, correction and judgment call, with the evidence behind it. */
-export function FindingsPanel({ findings }: { findings: Finding[] }) {
+export function FindingsPanel({ findings, onViewFile }: { findings: Finding[]; onViewFile?: (file: string) => void }) {
   const [show, setShow] = useState<Record<Filter, boolean>>({ error: true, warning: true, info: true, filing: false });
   const count = (k: Filter) => findings.filter((f) => kind(f) === k).length;
   const visible = findings.filter((f) => show[kind(f)]);
@@ -41,14 +41,14 @@ export function FindingsPanel({ findings }: { findings: Finding[] }) {
         ))}
       </div>
       <ul className="space-y-2">
-        {visible.map((f, i) => <FindingRow key={`${f.id}-${f.field}-${i}`} f={f} />)}
+        {visible.map((f, i) => <FindingRow key={`${f.id}-${f.field}-${i}`} f={f} onViewFile={onViewFile} />)}
         {!visible.length && <li className="py-6 text-center text-sm text-slate-400">Nothing to show with these filters.</li>}
       </ul>
     </Card>
   );
 }
 
-function FindingRow({ f }: { f: Finding }) {
+function FindingRow({ f, onViewFile }: { f: Finding; onViewFile?: (file: string) => void }) {
   const k = kind(f);
   return (
     <li>
@@ -70,7 +70,12 @@ function FindingRow({ f }: { f: Finding }) {
               {f.evidence.map((e, i) => (
                 <li key={i} className="flex gap-2 text-xs">
                   <span className="shrink-0"><Badge>{LABEL[e.source] ?? e.source}</Badge></span>
-                  <q className="font-mono text-[11px] text-slate-700">{e.text}</q>
+                  <q className="flex-1 font-mono text-[11px] text-slate-700">{e.text}</q>
+                  {e.file && onViewFile && (
+                    <button type="button" onClick={() => onViewFile(e.file!)} className="shrink-0 text-[10px] font-medium text-blue-600 hover:underline" title={`Show ${e.file}`}>
+                      view ↗
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

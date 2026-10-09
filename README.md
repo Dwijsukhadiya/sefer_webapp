@@ -16,7 +16,7 @@ npm run dev                   # http://localhost:3000
 ```
 
 - **No API key?** Click **Use sample shipment** (or open `/?sample`). It loads the hand-transcribed extraction of the three sample PDFs, and everything after extraction runs normally.
-- `npm test` runs 50 Vitest tests: the 11 sample traps, XSD validation, MID rules, the extraction retry loop, 7 shipment variants the app has never seen, and regression cases taken from real model output.
+- `npm test` runs 62 Vitest tests: the 11 sample traps, XSD validation, MID rules, the extraction retry loop, 7 shipment variants the app has never seen, regression cases taken from real model output, the PGA scan, and the audit trail.
 - `npx tsx scripts/generate-sample.ts` regenerates the committed sample output.
 - `npx tsx scripts/eval-extraction.ts` runs the real model on the sample PDFs and scores it field by field against the fixture. It needs a key.
 
@@ -59,11 +59,25 @@ src/lib/extract/        prompt, Zod schema, Gemini + Anthropic providers, retry 
 src/lib/reconcile/      facts.ts (who supplies which field), rules/ (one file per rule), mid.ts
 src/lib/netchb/         map.ts (facts → XSD tree), build.ts, validate.ts, codes.ts, brokerInputs.ts
 src/lib/pipeline.ts     reconcile → broker inputs → map → XML → validate
+src/lib/audit.ts        compliance audit record (pure): model output, manual edits, decisions, XML
 schemas/                NetCHB entry.xsd + data_type.xsd, and SOURCE.md: how they were found
 fixtures/shipment-001/  sample PDFs + hand-written expected extraction (not model-generated)
 ```
 
 Adding a rule means one file in `src/lib/reconcile/rules/`, one line in `src/lib/reconcile/index.ts`, and one test.
+
+## Built for the broker's review
+
+- **Split-screen verification.** The source PDF or scan stays beside the findings and entry while you review. Tabs switch between documents. Each document has a **View source** toggle, and every quoted piece of evidence in a finding has a **view** link that opens the document it came from.
+- **Partner Government Agency (PGA) early warning.** The `PGA_POSSIBLE` rule reads each line's description, style and material for signs of FDA, FCC, EPA, NHTSA, APHIS, FWS, Lacey Act, CPSC, TTB or ATF territory. Each hit names the agency, the matched word, and the `<…-items>` block in NetCHB's `entry.xsd` where the message set is filed or disclaimed. It is a keyword hint, not a determination: CBP derives PGA requirements from the 10-digit HTS number's PGA flags, and the finding says so. It avoids common apparel false positives (faux fur, "ivory" as a colour, shell jackets) and is silent on the sample shipment, which is correct for adult apparel.
+- **Compliance audit trail export.** One click downloads `audit-trail-<entry>.json`, a supporting record for 19 CFR Part 163 recordkeeping (5 years from the date of entry, 19 CFR 163.4). It holds:
+  - what the model extracted;
+  - every manual edit as `path: extracted → reviewed`;
+  - the broker inputs and reconciled facts;
+  - the corrections the rules applied (each with its evidence), separated from the issues still open;
+  - the exact XML, its XSD result, and the SHA-256 of the schema used;
+  - SHA-256 hashes of the source files and the XML.
+- **Graceful degradation.** Each panel has its own React error boundary. If an unusual document breaks one section's rendering, that section shows what failed and offers a retry; the rest of the entry keeps working. Boundaries reset when the entry is rebuilt.
 
 ## How NetCHB was tracked down
 
@@ -82,7 +96,8 @@ The brief gave no link. The full trail, with dead ends, is in [`schemas/SOURCE.m
 ## What it does not do (and says so)
 
 - **No 10-digit HTS classification.** Invoices carry 6-digit HS. The XML carries the digits exactly as printed (schema-valid, never zero-padded to look real), and every line is flagged for the broker. Reporting units (e.g. DOZ + KG for apparel) follow from the 10-digit number.
-- **No Chapter 99 / Section 301 / AD-CVD / PGA handling.** Origin is set per line so NetCHB's own remedy logic can work, but the app does not stack trade remedies.
+- **No Chapter 99 / Section 301 / AD-CVD handling, and no PGA message sets.** Origin is set per line so NetCHB's own remedy logic can work, but the app does not stack trade remedies. PGA is flagged by keyword only. It never files or disclaims agency data; that follows from the 10-digit HTS flags.
+- **The audit file is a supporting record, not the entry record itself.** The commercial documents and the filed entry are what 19 CFR 163 requires you to keep; the audit trail explains how this entry was prepared from them.
 - **The MID is built from CBP's published rules, not looked up.** Ambiguous addresses (e.g. "Lot C7-C8") are flagged for checking against the broker's NetCHB manufacturer table.
 - **The importer of record is proposed, never decided silently.** The buyer is preferred over a 3PL consignee, and the choice is flagged and switchable.
 - **One `<invoice>` per entry.** With several invoices, lines are merged and a warning says so.
