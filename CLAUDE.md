@@ -14,8 +14,7 @@ It must work for shipments we have never seen. The sample shipment is a test fix
 ## Domain primer (keep this straight)
 
 - **Entry / 7501**: the filing a licensed customs broker sends to CBP describing imported goods. NetCHB is ABI software that brokers use to transmit it to CBP's ACE system.
-- **NetCHB** (now Descartes NetCHB) accepts entries over an RPC/literal SOAP service. **Confirmed from NetCHB's live WSDL** (`schemas/EntryUploadService.wsdl`): `uploadEntry(username, password, entryXml) -> result`, endpoint `https://www.netchb.com:443/main/services/entry/EntryUploadService`. The entry document schema is `https://www.netchb.com/xml/entry/entry.xsd` (+ `data_type.xsd`, location given by its import).
-- **Unconfirmed until we read entry.xsd:** that a transmit flag controls CBP transmission (omit it = stage only), and that NetCHB calculates duty itself. Treat both as assumptions and label them in the README until verified against the schema.
+- **NetCHB** (now Descartes NetCHB) accepts entries over a SOAP web service: `uploadEntry(username, password, entryXml)` (live WSDL in `schemas/`). Schema: `entry.xsd` + `data_type.xsd`, downloaded from netchb.com on 9 Oct 2026. **Confirmed from the XSD annotations:** omitting `<transmit/>` stages the entry without sending it to CBP; NetCHB calculates duty unless `<precalculated/>` is present. We never emit either tag.
 - **Importer of record (IOR)**: the party liable for the entry. Usually the buyer, not necessarily the B/L consignee (a consignee can be a 3PL warehouse).
 - **Manufacturer vs seller**: the MID (Manufacturer ID) is built from the **manufacturer's** name/address/city, never from a trading or sourcing intermediary.
 - **Customs value**: transaction value. For CIF/CFR/CIP/CPT terms, separately stated international freight and insurance are removed. **Assists** (materials the buyer supplied free or cheaply for production) are **added**.
@@ -57,15 +56,21 @@ npm test             # vitest
 npm run build
 ```
 
-Env: `ANTHROPIC_API_KEY` (see `.env.example`).
+Env: `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` (see `.env.example`). Without a key, `/?sample` loads the hand-transcribed fixture.
+
+```bash
+npx tsx scripts/generate-sample.ts   # regenerate output/shipment-001-entry.xml
+npx tsx scripts/eval-extraction.ts   # real model vs fixture (needs a key)
+```
 
 ## Key paths
 
 - `schemas/` NetCHB XSDs + `SOURCE.md` (provenance: where and how each file was found)
 - `fixtures/shipment-001/` sample PDFs + hand-written expected extraction and findings (never model-generated)
-- `src/lib/extract/` LLM extraction
+- `src/lib/extract/` LLM extraction (`providers/gemini.ts`, `providers/anthropic.ts`; shared Zod validate + retry in `client.ts`)
 - `src/lib/reconcile/` rules engine, valuation, parties, MID
-- `src/lib/netchb/` mapping, XML build, XSD validation, code lists
+- `src/lib/netchb/` mapping (`map.ts`: every schema compromise emits a `filing` finding), XML build, XSD validation, code lists
+- `src/lib/pipeline.ts` the deterministic half: reconcile → broker inputs → map → XML → validate
 - `output/shipment-001-entry.xml` generated entry for the sample (deliverable)
 
 ## Sample shipment: known traps (regression tests must catch all)
@@ -77,7 +82,7 @@ Env: `ANTHROPIC_API_KEY` (see `.env.example`).
 5. Seller Kowloon Bay (HK) ≠ manufacturer Saigon Phoenix (VN). MID from Saigon Phoenix.
 6. IOR probably Northbound Outfitters (buyer); B/L consignee Cascade Fulfillment is a 3PL. Flag, don't decide silently.
 7. CIF 27,270 → FOB 23,235 after removing freight 3,850 and insurance 185.
-8. Container OPLU3041728 struck through, OPLU3041722 handwritten. Surface both, never auto-pick.
+8. Container OPLU3041728 struck through, OPLU3041722 handwritten. Always surface both as an error-level finding. Auto-pick only when the ISO 6346 check digit proves one impossible (1728's check digit should be 2, so 1722 is used). Decided with the user 9 Oct 2026; the broker can override in the UI.
 9. Gross weight 1,888.00 kg (PL) vs 1,930.000 kg (B/L).
 10. HS codes are 6-digit; 10-digit HTS needs broker review.
 11. House B/L BMLVHCM26090418 (SCAC BMLV) on master OPLUSGN260917735 (SCAC OPLU).

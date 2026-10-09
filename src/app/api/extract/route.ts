@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
-import { ExtractionError, extractFile } from "@/lib/extract/client";
+import { ExtractionError, extractFile, hasExtractionKey } from "@/lib/extract/client";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
+function guessType(name: string): string {
+  const ext = name.toLowerCase().split(".").pop() ?? "";
+  const types: Record<string, string> = { pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
+  return types[ext] ?? "application/octet-stream";
+}
+
 /** multipart files → DocumentExtraction[]. The only route that calls the model. */
 export async function POST(req: Request) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set on the server." }, { status: 500 });
+  if (!hasExtractionKey()) {
+    return NextResponse.json({ error: "No model API key on the server. Set GEMINI_API_KEY or ANTHROPIC_API_KEY." }, { status: 500 });
   }
   const form = await req.formData();
   const files = form.getAll("files").filter((f): f is File => f instanceof File);
@@ -19,8 +25,7 @@ export async function POST(req: Request) {
     files.map(async (f) => {
       if (f.size > MAX_BYTES) throw new ExtractionError("File is larger than 20 MB", f.name);
       const base64 = Buffer.from(await f.arrayBuffer()).toString("base64");
-      const mediaType = f.type || (f.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/octet-stream");
-      return extractFile({ name: f.name, mediaType, base64 });
+      return extractFile({ name: f.name, mediaType: f.type || guessType(f.name), base64 });
     }),
   );
 

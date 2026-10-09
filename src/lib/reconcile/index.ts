@@ -9,6 +9,7 @@ import { invoiceTotals } from "./rules/invoiceTotals";
 import { lineArithmetic } from "./rules/lineArithmetic";
 import { lineOrigin } from "./rules/lineOrigin";
 import { marking } from "./rules/marking";
+import { multipleInvoices } from "./rules/multipleInvoices";
 import { noCommercialValue } from "./rules/noCommercialValue";
 import { packagesAndWeight } from "./rules/packagesAndWeight";
 import { packingMath } from "./rules/packingMath";
@@ -38,6 +39,7 @@ export const RULES: Rule[] = [
   transport,
   dates,
   marking,
+  multipleInvoices,
 ];
 
 const RANK = { error: 0, warning: 1, info: 2 } as const;

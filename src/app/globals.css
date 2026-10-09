@@ -1,26 +1,234 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Design tokens
+   ------------------------------------------------------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #eef1f6;
+  --foreground: #0f172a;
+
+  --navy-950: #070d1a;
+  --navy-900: #0b1426;
+  --navy-800: #13203a;
+  --navy-700: #1d2d4f;
+
+  --card: #ffffff;
+  --card-border: #e3e8ef;
+  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.05);
+  --card-shadow-hover: 0 2px 4px rgba(15, 23, 42, 0.06), 0 12px 28px rgba(15, 23, 42, 0.09);
+
+  --sev-error: #dc2626;
+  --sev-error-bg: #fef2f2;
+  --sev-warning: #d97706;
+  --sev-warning-bg: #fffbeb;
+  --sev-info: #2563eb;
+  --sev-info-bg: #eff6ff;
+  --sev-ok: #059669;
+  --sev-ok-bg: #ecfdf5;
+  --sev-xml: #7c3aed;
+  --sev-xml-bg: #f5f3ff;
+
+  --accent: #2563eb;
+
+  /* XML syntax colours (on the dark code block) */
+  --xml-bg: #0b1222;
+  --xml-gutter: #4b5875;
+  --xml-punct: #7d8bab;
+  --xml-tag: #7dd3fc;
+  --xml-attr: #c4b5fd;
+  --xml-value: #fcd34d;
+  --xml-text: #e2e8f0;
+  --xml-decl: #94a3b8;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "Source Code Pro", ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  interpolate-size: allow-keywords; /* lets <details> animate to height:auto where supported */
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* ---------------------------------------------------------------------------
+   Cards
+   ------------------------------------------------------------------------- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 200ms ease, transform 200ms ease;
+  animation: fade-in-up 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.card:hover {
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: var(--navy-900);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------------------------------------------------------------------------
+   Badges
+   ------------------------------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  transition: transform 150ms ease;
+  white-space: nowrap;
+}
+.badge:hover { transform: scale(1.05); }
+.badge-red { background: var(--sev-error-bg); color: #b91c1c; box-shadow: inset 0 0 0 1px #fecaca; }
+.badge-amber { background: var(--sev-warning-bg); color: #b45309; box-shadow: inset 0 0 0 1px #fde68a; }
+.badge-blue { background: var(--sev-info-bg); color: #1d4ed8; box-shadow: inset 0 0 0 1px #bfdbfe; }
+.badge-green { background: var(--sev-ok-bg); color: #047857; box-shadow: inset 0 0 0 1px #a7f3d0; }
+.badge-violet { background: var(--sev-xml-bg); color: #6d28d9; box-shadow: inset 0 0 0 1px #ddd6fe; }
+.badge-slate { background: #f1f5f9; color: #475569; box-shadow: inset 0 0 0 1px #e2e8f0; }
+
+.dot { width: 8px; height: 8px; border-radius: 9999px; display: inline-block; }
+.dot-error { background: var(--sev-error); }
+.dot-warning { background: var(--sev-warning); }
+.dot-info { background: var(--sev-info); }
+.dot-xml { background: var(--sev-xml); }
+
+/* ---------------------------------------------------------------------------
+   Findings
+   ------------------------------------------------------------------------- */
+.finding {
+  border: 1px solid var(--card-border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: #fff;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+.finding:hover { box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06); }
+.finding[open] { background: #fbfcfe; }
+.finding-error { border-left-color: var(--sev-error); }
+.finding-warning { border-left-color: var(--sev-warning); }
+.finding-info { border-left-color: var(--sev-info); }
+.finding-xml { border-left-color: var(--sev-xml); }
+.finding-doc { border-left-color: #64748b; }
+
+.finding > summary::-webkit-details-marker { display: none; }
+.finding .chevron { transition: transform 200ms ease; }
+.finding[open] .chevron { transform: rotate(90deg); }
+
+/* Smooth open/close: native height transition where supported, fade/slide everywhere. */
+.finding::details-content {
+  block-size: 0;
+  overflow: hidden;
+  transition: block-size 240ms ease, content-visibility 240ms allow-discrete;
+}
+.finding[open]::details-content { block-size: auto; }
+.finding[open] > .finding-body { animation: slide-down 240ms ease both; }
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------------------------------------------------------------------------
+   Upload dropzone
+   ------------------------------------------------------------------------- */
+.dropzone {
+  border: 2px dashed #93b4f5;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f5f8ff 0%, #eef4ff 50%, #f7f5ff 100%);
+  animation: dash-pulse 2.6s ease-in-out infinite;
+  transition: background 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+.dropzone:hover {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, #eef4ff 0%, #e4edff 50%, #efeaff 100%);
+  transform: translateY(-1px);
+}
+@keyframes dash-pulse {
+  0%, 100% { border-color: #a9c1f3; box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+  50% { border-color: #5b8def; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.07); }
+}
+
+/* ---------------------------------------------------------------------------
+   XML viewer
+   ------------------------------------------------------------------------- */
+.xml-view {
+  background: var(--xml-bg);
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--xml-text);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12);
+}
+.xml-line { display: flex; }
+.xml-line:hover { background: rgba(148, 163, 184, 0.07); }
+.xml-ln {
+  flex: none;
+  width: 3.2em;
+  padding-right: 1em;
+  text-align: right;
+  color: var(--xml-gutter);
+  user-select: none;
+  border-right: 1px solid rgba(148, 163, 184, 0.12);
+  margin-right: 1em;
+}
+.xml-code { white-space: pre; }
+.xml-punct { color: var(--xml-punct); }
+.xml-tag { color: var(--xml-tag); }
+.xml-attr { color: var(--xml-attr); }
+.xml-value { color: var(--xml-value); }
+.xml-text { color: var(--xml-text); }
+.xml-decl { color: var(--xml-decl); font-style: italic; }
+
+/* ---------------------------------------------------------------------------
+   Small motion helpers
+   ------------------------------------------------------------------------- */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }
+
+@keyframes check-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.check-pop { animation: check-pop 320ms ease-out both; }
+
+.zebra > tr:nth-child(even) { background: #f8fafc; }
+.zebra > tr { transition: background-color 120ms ease; }
+.zebra > tr:hover { background: #f1f5fb; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }

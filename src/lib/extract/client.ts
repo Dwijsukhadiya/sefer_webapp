@@ -1,19 +1,14 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { EXTRACTION_SYSTEM, EXTRACTION_USER } from "./prompt";
+import { anthropicProvider } from "./providers/anthropic";
+import { geminiProvider } from "./providers/gemini";
+import { SUPPORTED_MEDIA, type ExtractionProvider, type UploadedFile } from "./providers/types";
 import { FileExtraction, type ExtractedDoc } from "./schema";
 
-const MODEL = process.env.EXTRACT_MODEL ?? "claude-sonnet-5-5";
-const TOOL_NAME = "record_documents";
+export type { UploadedFile } from "./providers/types";
 
-// JSON Schema for the tool input, generated from the Zod source of truth.
-const inputSchema = z.toJSONSchema(FileExtraction, { target: "draft-7" }) as Anthropic.Tool.InputSchema;
-
-export interface UploadedFile {
-  name: string;
-  mediaType: string; // application/pdf, image/png, image/jpeg
-  base64: string;
-}
+// JSON Schema for the model's output, generated from the Zod source of truth.
+const jsonSchema: Record<string, unknown> = { ...z.toJSONSchema(FileExtraction, { target: "draft-7" }) };
+delete jsonSchema.$schema; // Gemini rejects the meta-schema key
 
 export class ExtractionError extends Error {
   constructor(message: string, public file: string, public issues?: unknown) {
@@ -21,58 +16,30 @@ export class ExtractionError extends Error {
   }
 }
 
-function contentFor(file: UploadedFile): Anthropic.ContentBlockParam {
-  if (file.mediaType === "application/pdf") {
-    return { type: "document", title: file.name, source: { type: "base64", media_type: "application/pdf", data: file.base64 } };
-  }
-  if (["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.mediaType)) {
-    return {
-      type: "image",
-      source: { type: "base64", media_type: file.mediaType as "image/png" | "image/jpeg" | "image/webp" | "image/gif", data: file.base64 },
-    };
-  }
-  throw new ExtractionError(`Unsupported file type ${file.mediaType}. Upload PDF or image files.`, file.name);
+/** EXTRACT_PROVIDER picks explicitly; otherwise whichever API key is configured (Gemini first). */
+export function defaultProvider(): ExtractionProvider {
+  const pick = process.env.EXTRACT_PROVIDER ?? (process.env.GEMINI_API_KEY ? "gemini" : "anthropic");
+  return pick === "gemini" ? geminiProvider(jsonSchema) : anthropicProvider(jsonSchema);
 }
 
+export const hasExtractionKey = () => !!(process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY);
+
 /**
- * One model call per file. The model is forced to answer through a tool whose input
- * schema is our Zod schema, then the result is validated again with Zod. On a schema
- * failure we retry once, telling the model what was wrong; after that we surface the error.
+ * One model call per file. The output is validated with Zod; on a schema failure we retry
+ * once, telling the model what was wrong. After that we surface the error, never guess.
  */
-export async function extractFile(file: UploadedFile, client = new Anthropic()): Promise<ExtractedDoc[]> {
-  const messages: Anthropic.MessageParam[] = [
-    { role: "user", content: [contentFor(file), { type: "text", text: EXTRACTION_USER }] },
-  ];
-
+export async function extractFile(file: UploadedFile, provider = defaultProvider()): Promise<ExtractedDoc[]> {
+  if (!SUPPORTED_MEDIA.includes(file.mediaType)) {
+    throw new ExtractionError(`Unsupported file type ${file.mediaType}. Upload PDF or image files.`, file.name);
+  }
+  let feedback: string | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await client.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      system: EXTRACTION_SYSTEM,
-      tools: [{ name: TOOL_NAME, description: "Record the transcribed documents.", input_schema: inputSchema }],
-      tool_choice: { type: "tool", name: TOOL_NAME },
-      messages,
-    });
-    const call = res.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-    if (!call) throw new ExtractionError("Model returned no structured output", file.name);
-
-    const parsed = FileExtraction.safeParse(call.input);
+    const { output, truncated } = await provider.transcribe(file, feedback);
+    const parsed = FileExtraction.safeParse(output);
     if (parsed.success) return parsed.data.documents.map((d) => ({ ...d, sourceFile: file.name }));
-    if (res.stop_reason === "max_tokens") throw new ExtractionError("Document too long to transcribe in one pass", file.name);
-
-    messages.push(
-      { role: "assistant", content: res.content },
-      {
-        role: "user",
-        content: [{
-          type: "tool_result",
-          tool_use_id: call.id,
-          is_error: true,
-          content: `Your output did not match the schema: ${z.prettifyError(parsed.error)}. Call ${TOOL_NAME} again with corrected output.`,
-        }],
-      },
-    );
-    if (attempt === 1) throw new ExtractionError("Extraction did not match the schema after a retry", file.name, parsed.error.issues);
+    if (truncated) throw new ExtractionError("Document too long to transcribe in one pass", file.name);
+    feedback = output === null ? "Your reply was not valid JSON." : z.prettifyError(parsed.error);
+    if (attempt === 1) throw new ExtractionError(`Extraction by ${provider.name} did not match the schema after a retry`, file.name, parsed.error.issues);
   }
   throw new ExtractionError("unreachable", file.name);
 }

@@ -3,9 +3,9 @@
  * output field-by-field with the hand-transcribed fixture. Then runs reconciliation on
  * the MODEL's output to confirm every known trap is still caught end to end.
  *
- *   ANTHROPIC_API_KEY=... npx tsx scripts/eval-extraction.ts
+ *   GEMINI_API_KEY=... (or ANTHROPIC_API_KEY=...) npx tsx scripts/eval-extraction.ts
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { extractFile } from "../src/lib/extract/client";
 import type { ExtractedDoc } from "../src/lib/extract/schema";
@@ -51,6 +51,7 @@ async function main() {
   console.log(`\nField accuracy: ${ok}/${total} (${((ok / total) * 100).toFixed(1)}%)`);
   misses.forEach((m) => console.log("  MISS " + m));
 
+  if (process.env.EVAL_DUMP) writeFileSync(process.env.EVAL_DUMP, JSON.stringify(extracted, null, 2)); // inspect what the model returned
   const r = reconcile(extracted);
   const ids = new Set(r.findings.map((f) => f.id));
   const traps = ["LINE_EXTENSION_MISMATCH", "QUANTITY_MISMATCH", "ASSIST_DETECTED", "LINE_ORIGIN_DIFFERS", "IMPORTER_OF_RECORD",

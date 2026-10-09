@@ -26,7 +26,7 @@ export const htsClassification: Rule = {
           : "A tariff number must be assigned by the broker.",
         evidence: line.hsAsPrinted ? [{ source: "commercial_invoice", text: `HS ${line.hsAsPrinted}` }] : [],
         resolution: digits
-          ? `The XML carries the code as ${digits.padEnd(10, "0")} only as a placeholder and is marked for review. The broker must classify to 10 digits and check Chapter 99 (Section 301/IEEPA) additional duties for origin ${line.originIso ?? "?"}.`
+          ? `The XML carries the ${digits.length} digits exactly as printed (never zero-padded, which would look like a real classification). Broker must classify to 10 digits (hts.usitc.gov, heading ${digits.slice(0, 4)}) and check Chapter 99 additional duties for origin ${line.originIso ?? "?"}.`
           : "Broker must classify.",
         autoApplied: false,
       });

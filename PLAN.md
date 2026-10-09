@@ -6,6 +6,21 @@
 
 ---
 
+## Status (9 Oct 2026)
+
+| Phase | State |
+|---|---|
+| 0 Recon | **Done.** WSDL (8 Oct) plus `entry.xsd` and `data_type.xsd` downloaded 9 Oct; see `schemas/SOURCE.md`. Transmit and duty behaviour confirmed from the XSD. |
+| 1 Scaffold | Done. Deploy left to the author (Vercel). |
+| 2 Extraction | Done: Gemini or Anthropic providers, Zod validation, one retry. Live eval pending an API key. |
+| 3 Reconciliation | Done: 16 rules; all 11 sample traps tested. |
+| 4 XML + XSD | **Done.** `output/shipment-001-entry.xml` validates against NetCHB's entry.xsd. |
+| 5 UI | Done: upload/sample → findings → broker inputs → entry lines → XML → editable extractions. |
+| 6 Generalisation | Done: 7 variant tests (EUR/FOB, CIF unitemised, AWB, invoice only, no HS, seller=factory, 2 invoices). |
+| 7 Docs | README, WRITEUP, SOURCE.md written. Remaining: chat export, deploy, live extraction eval. |
+
+Open questions from §8 answered by the schema: many invoices per entry are allowed; there is no assist element (assist goes in line value); origin and MID are per line only; the MID is a plain ≤15-char string; entry type 01 is valid; the transmit flag is `<transmit/>`, and omitting it stages only.
+
 ## 0. What's actually being graded
 
 From the brief, verbatim:
@@ -25,8 +40,6 @@ Also: there's a 45-min walkthrough call with **a small live change** to the solu
 ---
 
 ## 1. Recon findings so far (Phase 0, partially done)
-
-> **Update 8 Oct, 19:20 IST:** Primary source found. NetCHB's JBossWS index lives at `/main/services/entry/EntryUploadService`. The WSDL (`?wsdl=EntryUploadService.wsdl`) confirms `uploadEntry(username, password, entryXml)`, RPC/literal. Entry schema at **`https://www.netchb.com/xml/entry/entry.xsd`**. Sandbox egress blocks netchb.com, so the XSDs are downloaded manually. Full trail in `schemas/SOURCE.md`. The duty and transmit-flag claims below are **unverified** until we read entry.xsd.
 
 ### NetCHB — what's confirmed
 

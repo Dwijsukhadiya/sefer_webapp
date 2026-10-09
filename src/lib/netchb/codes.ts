@@ -35,3 +35,48 @@ export const ENTRY_TYPES: Record<string, string> = {
 export const INCOTERMS_INCLUDING_FREIGHT = new Set(["CIF", "CFR", "CPT", "CIP", "DAP", "DPU", "DDP"]);
 export const INCOTERMS_INCLUDING_INSURANCE = new Set(["CIF", "CIP", "DAP", "DPU", "DDP"]);
 export const INCOTERMS_KNOWN = new Set(["EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"]);
+
+/** NetCHB containerType enumerations (entry.xsd, containerType). */
+export function containerSize(raw: string | null): string | null {
+  if (!raw) return null;
+  const s = raw.toUpperCase();
+  const len = s.match(/\b(20|40|45|53)\s*(?:'|FT|FOOT)?/);
+  if (!len) return null;
+  const hc = /\bH[CQ]\b|HIGH\s*CUBE|\d{2}\s*'?\s*H[CQ]/.test(s);
+  return `${len[1]} ft${hc ? " HC" : ""}`;
+}
+
+export function containerType(raw: string | null): string | null {
+  if (!raw) return null;
+  const s = raw.toUpperCase();
+  if (/R[FH]\b|REEFER/.test(s)) return "Reefer";
+  if (/OT\b|OPEN/.test(s)) return "Open";
+  if (/FR\b|FLAT/.test(s)) return "Flat Rack";
+  if (/TK\b|TANK/.test(s)) return "Tank";
+  if (/GP\b|DV\b|DC\b|DRY|H[CQ]\b/.test(s)) return "Dry";
+  return null;
+}
+
+/** Manifest quantity unit (max 5 chars in entry.xsd). Common ANSI X12 package codes. */
+const PACKAGE_UNITS: Array<[RegExp, string]> = [
+  [/CARTON|CTN/i, "CTN"], [/PALLET|PLT/i, "PLT"], [/PACKAGE|PKG/i, "PKG"], [/CASE/i, "CAS"],
+  [/BALE/i, "BLE"], [/ROLL/i, "ROL"], [/BAG/i, "BAG"], [/DRUM/i, "DRM"], [/CRATE/i, "CRT"], [/BOX/i, "BOX"],
+];
+export function packageUnit(raw: string | null): string | null {
+  if (!raw) return null;
+  for (const [re, code] of PACKAGE_UNITS) if (re.test(raw)) return code;
+  return raw.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 5) || null;
+}
+
+/** CBP mode of transportation codes (entry.xsd modeTransportType). */
+export function transportMode(mode: "ocean" | "air" | null, containerised: boolean): string | null {
+  if (mode === "ocean") return containerised ? "11" : "10";
+  if (mode === "air") return containerised ? "41" : "40";
+  return null;
+}
+
+export const US_STATES = new Set([
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME",
+  "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI",
+  "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "AS", "FM", "GU", "MH", "MP", "PW", "PR", "VI",
+]);

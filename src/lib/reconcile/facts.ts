@@ -51,7 +51,7 @@ export function sameCompany(a: string, b: string): boolean {
   return sig(a) !== "" && sig(a) === sig(b);
 }
 
-function collectManufacturers(docs: ExtractedDoc[], seller: PartyFact | null): ManufacturerFact[] {
+function collectManufacturers(docs: ExtractedDoc[], seller: PartyFact | null, origin: string | null): ManufacturerFact[] {
   const out: ManufacturerFact[] = [];
   const add = (p: PartyFact) => {
     const existing = out.find((m) => sameCompany(m.name, p.name));
@@ -62,12 +62,25 @@ function collectManufacturers(docs: ExtractedDoc[], seller: PartyFact | null): M
     const mid = buildMid({ name: p.name, streetLine: p.addressLines[0] ?? null, city: p.city, countryIso: p.countryIso, province: p.state });
     out.push({ ...p, key: `M${out.length + 1}`, mid: mid.mid, midNeedsReview: mid.needsReview });
   };
-  for (const d of docs) for (const p of d.parties) if (p.role === "manufacturer") add(toPartyFact(p, d.docType));
-  // A transport-doc shipper that is not the seller is very often the factory.
-  if (out.length === 0) {
-    for (const d of docsOf(docs, "bill_of_lading", "air_waybill", "packing_list"))
-      for (const p of d.parties)
-        if (p.role === "shipper" && (!seller || !sameCompany(p.name, seller.name))) add(toPartyFact(p, d.docType));
+  // "Contracted factory in Binh Duong" with no street address is a description, not a company:
+  // it cannot yield a MID, and taking it would hide the real factory named elsewhere.
+  const unnamed = (p: Party) => !p.addressLines.length && /\b(factory|plant|producer|manufacturer|mill|workshop|subcontractor|contracted)\b/i.test(p.name);
+  for (const d of docs) for (const p of d.parties) if (p.role === "manufacturer" && !unnamed(p)) add(toPartyFact(p, d.docType));
+  // A shipper that is not the seller is very often the factory. Use it when no producer is
+  // named in the origin country (a sister factory elsewhere does not count). Prefer the copy
+  // whose address is in the origin country: a packing list may print the factory's name with
+  // its trading agent's address ("on behalf of ..."), the bill of lading the real one.
+  if (!out.some((m) => !origin || m.countryIso === origin)) {
+    const shippers = [...docsOf(docs, "bill_of_lading", "air_waybill"), ...docsOf(docs, "packing_list")]
+      .flatMap((d) => d.parties.filter((p) => p.role === "shipper").map((p) => toPartyFact(p, d.docType)))
+      .filter((p) => !seller || !sameCompany(p.name, seller.name))
+      .sort((a, b) => Number(b.countryIso === origin) - Number(a.countryIso === origin));
+    for (const p of shippers) add(p);
+  }
+  // Nobody else is named: the seller is very often the factory itself. Assume it, and say so.
+  if (out.length === 0 && seller && seller.countryIso && seller.countryIso !== "US") {
+    add(seller);
+    out[0].assumedFromSeller = true;
   }
   return out;
 }
@@ -116,6 +129,7 @@ export function buildFacts(docs: ExtractedDoc[]): ShipmentFacts {
   const seller = findParty(invoices, "seller") ?? findParty(docs, "seller");
   const buyer = findParty(invoices, "buyer") ?? findParty(docs, "buyer");
   const consignee = findParty(transport, "consignee") ?? findParty(docs, "consignee");
+  const shipTo = findParty(invoices, "ship_to") ?? consignee;
   const shipmentOrigin = toIso2(first(inv?.statedCountryOfOrigin, tr?.statedCountryOfOrigin));
 
   const nvocc = tr?.parties.find((p) => p.role === "nvocc");
@@ -133,8 +147,9 @@ export function buildFacts(docs: ExtractedDoc[]): ShipmentFacts {
   const charges = invoices.flatMap((d) => d.charges);
   const chargeSum = (k: string) => charges.filter((c) => c.kind === k).reduce((a, c) => a + toCents(c.amount), 0);
 
-  const manufacturers = collectManufacturers(docs, seller);
-  const defaultMfr = manufacturers.find((m) => m.countryIso === shipmentOrigin) ?? manufacturers[0];
+  const manufacturers = collectManufacturers(docs, seller, shipmentOrigin);
+  // Never give a line a producer from another country: a missing MID is flagged, a wrong one is not.
+  const defaultMfr = shipmentOrigin ? manufacturers.find((m) => m.countryIso === shipmentOrigin) : manufacturers[0];
   for (const l of lines) l.manufacturerKey = defaultMfr?.key ?? null;
 
   const loading = first(tr?.portOfLoading, inv?.portOfLoading);
@@ -152,6 +167,7 @@ export function buildFacts(docs: ExtractedDoc[]): ShipmentFacts {
     consignee,
     seller,
     buyer,
+    shipTo,
     manufacturers,
 
     houseBill,
@@ -167,7 +183,7 @@ export function buildFacts(docs: ExtractedDoc[]): ShipmentFacts {
     exportCountryIso: toIso2(loading),
     exportDate: etd && etd.candidates.length === 1 ? etd.candidates[0] : null,
     arrivalDate: eta && eta.candidates.length === 1 ? eta.candidates[0] : null,
-    containers: (tr?.containers ?? []).filter((c) => c.number).map((c) => ({ number: c.number.replace(/\s/g, ""), seals: c.sealNumbers, checkDigitValid: null })),
+    containers: (tr?.containers ?? []).filter((c) => c.number).map((c) => ({ number: c.number.replace(/\s/g, ""), seals: c.sealNumbers, checkDigitValid: null, sizeType: c.sizeType })),
 
     packages: first(tr?.totals.totalPackages, packing[0]?.totals.totalPackages, inv?.totals.totalPackages),
     packageType: first(tr?.totals.packageType, packing[0]?.totals.packageType),

@@ -61,7 +61,8 @@ export const transport: Rule = {
         if (c) c.number = a.replacement.replace(/\s/g, "");
       }
       out.push({
-        id: "DOCUMENT_AMENDED", severity: pickNew ? "warning" : "error", category: "transport", field: a.field,
+        // A hand amendment is never routine, even when the check digit settles it.
+        id: "DOCUMENT_AMENDED", severity: "error", category: "transport", field: a.field,
         title: `${a.field} amended on the ${tr.docType.replace(/_/g, " ")}: "${a.original}" ${a.kind.replace(/_/g, " ")}${a.replacement ? `, "${a.replacement}" written in` : ""}`,
         detail: isContainer
           ? `ISO 6346 check digit: original ${origOk ? "valid" : "INVALID"}, replacement ${newOk === null ? "n/a" : newOk ? "valid" : "INVALID"}.` +

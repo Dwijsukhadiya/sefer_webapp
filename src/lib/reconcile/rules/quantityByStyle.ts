@@ -15,6 +15,8 @@ export const quantityByStyle: Rule = {
     const pl = docsOf(docs, "packing_list")[0];
     if (!inv || !pl) return out;
     let mismatches = 0;
+    // A per-style gap that equals a free-sample line's quantity is a classic counting mix-up.
+    const samplesExplaining = (diff: number) => facts.lines.filter((l) => l.noCommercialValue && l.quantity === Math.abs(diff));
 
     for (const line of facts.lines) {
       const p = pl.lineItems.find((x) => normKey(x.styleOrSku) && normKey(x.styleOrSku) === normKey(line.sku));
@@ -37,6 +39,7 @@ export const quantityByStyle: Rule = {
           detail:
             `A difference of ${Math.abs(diff)} ${line.uom ?? "units"}.` +
             (p.cartons && p.piecesPerCarton ? ` The packing list's own math (${p.cartons} cartons × ${p.piecesPerCarton}) gives ${p.cartons * p.piecesPerCarton}.` : "") +
+            samplesExplaining(diff).map((s) => ` The gap equals the ${s.quantity} free samples on ${lineLabel(s)}: one document may count them inside this style and the other separately.`).join("") +
             ` CBP requires the quantity actually imported. If fewer were shipped, the buyer may also be over-invoiced.`,
           evidence: [ev(inv, `${line.sku} qty ${line.quantity}`), ev(pl, `${p.styleOrSku} ${p.cartons ?? "?"} ctns × ${p.piecesPerCarton ?? "?"} = ${p.quantity}`)],
           resolution: `Entered at the invoice quantity (${line.quantity}) pending confirmation. Broker must confirm the shipped count with the shipper; if ${p.quantity}, the value must be adjusted.`,

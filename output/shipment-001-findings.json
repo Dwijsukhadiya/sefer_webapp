@@ -1,0 +1,642 @@
+{
+  "xsd": {
+    "valid": true,
+    "errors": []
+  },
+  "missing": [
+    {
+      "field": "filerCode",
+      "label": "Broker filer code",
+      "required": false,
+      "reason": "Assigned by CBP to the filing broker; never on shipping documents. Without it NetCHB generates the entry number from the account's own range."
+    },
+    {
+      "field": "importerNumber",
+      "label": "Importer of record number (IRS/EIN)",
+      "required": true,
+      "reason": "No document carries NORTHBOUND OUTFITTERS, INC.'s tax ID. NetCHB requires it for every entry type except 86."
+    },
+    {
+      "field": "bondType",
+      "label": "Bond type",
+      "required": true,
+      "reason": "Continuous (08) or single-transaction (09); comes from the importer's account."
+    },
+    {
+      "field": "suretyCode",
+      "label": "Surety code",
+      "required": false,
+      "reason": "Identifies the bond's surety company."
+    },
+    {
+      "field": "relatedParty",
+      "label": "Related-party indicator",
+      "required": true,
+      "reason": "Whether buyer and seller are related (19 U.S.C. 1401a(g)). No document says; the importer must declare it."
+    },
+    {
+      "field": "ladingPort",
+      "label": "Foreign port of lading (Schedule K)",
+      "required": false,
+      "reason": "The documents name \"CAT LAI, HCMC, VN\", but the 5-digit Schedule K code is not mapped by this tool."
+    },
+    {
+      "field": "hts.NB-T101",
+      "label": "10-digit HTSUS for NB-T101",
+      "required": true,
+      "reason": "Documents give only 6109.10. The 10-digit number also fixes the reporting units (apparel is usually DOZ + KG)."
+    },
+    {
+      "field": "hts.NB-H205",
+      "label": "10-digit HTSUS for NB-H205",
+      "required": true,
+      "reason": "Documents give only 6110.20. The 10-digit number also fixes the reporting units (apparel is usually DOZ + KG)."
+    },
+    {
+      "field": "hts.NB-C330",
+      "label": "10-digit HTSUS for NB-C330",
+      "required": true,
+      "reason": "Documents give only 6203.42. The 10-digit number also fixes the reporting units (apparel is usually DOZ + KG)."
+    },
+    {
+      "field": "hts.W-B220",
+      "label": "10-digit HTSUS for W-B220",
+      "required": true,
+      "reason": "Documents give only 6206.40. The 10-digit number also fixes the reporting units (apparel is usually DOZ + KG)."
+    },
+    {
+      "field": "hts.NB-P118S",
+      "label": "10-digit HTSUS for NB-P118S",
+      "required": true,
+      "reason": "Documents give only 6106.10. The 10-digit number also fixes the reporting units (apparel is usually DOZ + KG)."
+    }
+  ],
+  "findings": [
+    {
+      "id": "LINE_EXTENSION_MISMATCH",
+      "severity": "error",
+      "category": "arithmetic",
+      "field": "lines[NB-T101].amount",
+      "title": "Line 1 (NB-T101): printed amount does not equal quantity × unit price",
+      "detail": "2400 × 2.85 = USD 6,840.00, but the invoice prints USD 6,480.00. The invoice subtotal of USD 23,235.00 only adds up with USD 6,840.00, so the printed extension is a typo.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "NB-T101 qty 2400 @ 2.85 = USD 6,480.00 (printed)"
+        },
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "Goods subtotal USD 23,235.00"
+        },
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "SUB-TOTAL CARRIED FORWARD (USD): 21,975.00"
+        }
+      ],
+      "resolution": "Entered at USD 6,840.00. Ask the seller for a corrected invoice before filing.",
+      "autoApplied": true
+    },
+    {
+      "id": "QUANTITY_MISMATCH",
+      "severity": "error",
+      "category": "quantity",
+      "field": "lines[NB-H205].quantity",
+      "title": "Line 2 (NB-H205): invoice says 1200, packing list says 1176",
+      "detail": "A difference of 24 PCS. The packing list's own math (49 cartons × 24) gives 1176. The gap equals the 24 free samples on Line 5 (NB-P118S): one document may count them inside this style and the other separately. CBP requires the quantity actually imported. If fewer were shipped, the buyer may also be over-invoiced.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "NB-H205 qty 1200"
+        },
+        {
+          "source": "packing_list",
+          "file": "SPG-PL-2609-117_Packing_List.pdf",
+          "text": "NB-H205 49 ctns × 24 = 1176"
+        }
+      ],
+      "resolution": "Entered at the invoice quantity (1200) pending confirmation. Broker must confirm the shipped count with the shipper; if 1176, the value must be adjusted.",
+      "autoApplied": false
+    },
+    {
+      "id": "LINE_ORIGIN_DIFFERS",
+      "severity": "error",
+      "category": "origin",
+      "field": "lines[NB-P118S].countryOfOrigin",
+      "title": "Line 5 (NB-P118S) is made in BD, not VN",
+      "detail": "The shipment is declared as VN origin, but this line's own remarks say BD. Origin drives duty rates, trade-remedy tariffs and quota, so this line is entered separately with its own origin and manufacturer (SP Garments Dhaka Ltd., MID BDSPGAR41GAZ). The invoice declaration certifying single-country origin is therefore inaccurate.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "text": "(Origin: Bangladesh)"
+        },
+        {
+          "source": "packing_list",
+          "file": "SPG-PL-2609-117_Packing_List.pdf",
+          "text": "3. ** Carton No. 138: FOC samples (ladies polo NB-P118S) produced at our sister unit SP Garments Dhaka Ltd., Plot 41, Gazipur, Bangladesh. Made in Bangladesh. Hand-carried to Cat Lai CFS for consolidation."
+        },
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "DECLARATION: We hereby certify that this invoice shows the actual price of the goods described, that all particulars are true and correct, and that the goods are of Vietnam origin."
+        }
+      ],
+      "resolution": "Line entered with origin BD and manufacturer SP Garments Dhaka Ltd.. Ask the seller to correct the origin declaration.",
+      "autoApplied": true
+    },
+    {
+      "id": "ASSIST_DETECTED",
+      "severity": "error",
+      "category": "valuation",
+      "field": "lines[W-B220].assist",
+      "title": "Line 4 (W-B220): buyer-supplied material is an assist, so USD 4,180.00 is added to dutiable value",
+      "detail": "The price covers only part of the cost of making these goods; the buyer supplied the rest for free. Under 19 U.S.C. 1401a(h) that value must be added to the transaction value. Declared USD 1,260.00 + assist USD 4,180.00 = USD 5,440.00.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "(*) Style W-B220: Price is CMT (cut, make & trim) only. Main fabric (100% polyester crepe de chine, 1,450 m) supplied free of charge by buyer under buyer's fabric P.O. NB-26-0918F, value USD 4,180.00, not included in this invoice."
+        },
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "(*) Style W-B220: Price is CMT (cut, make & trim) only. Main fabric (100% polyester crepe de chine, 1,450 m) supplied free of charge by buyer under buyer's fabric P.O. NB-26-0918F, value USD 4,180.00, not included in this invoice."
+        },
+        {
+          "source": "packing_list",
+          "file": "SPG-PL-2609-117_Packing_List.pdf",
+          "text": "2. Style W-B220 sewn from buyer-supplied fabric (Ref. NB-26-0918F)."
+        }
+      ],
+      "resolution": "Added to the line's entered value. Broker should confirm the assist value (and any freight to deliver the fabric to the factory, which is also part of it).",
+      "autoApplied": true
+    },
+    {
+      "id": "FIBRE_MISMATCH",
+      "severity": "error",
+      "category": "classification",
+      "field": "lines[NB-H205].fibre",
+      "title": "Line 2 (NB-H205): fibre content differs between invoice and packing list",
+      "detail": "Invoice: 60% Cotton 40% Polyester brushed fleece, 280 GSM. Packing list: TC 65/35 FLEECE 280GSM (\"TC\" conventionally means Tetoron/polyester first, then cotton). The chief-weight fibre is cotton on one and polyester on the other. For apparel that changes the HTS subheading and the duty rate.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "60% Cotton 40% Polyester brushed fleece, 280 GSM"
+        },
+        {
+          "source": "packing_list",
+          "file": "SPG-PL-2609-117_Packing_List.pdf",
+          "text": "TC 65/35 FLEECE 280GSM"
+        }
+      ],
+      "resolution": "Classification left for broker review. Obtain a fibre content certificate or a lab test from the factory.",
+      "autoApplied": false
+    },
+    {
+      "id": "DOCUMENT_AMENDED",
+      "severity": "error",
+      "category": "transport",
+      "field": "container number",
+      "title": "container number amended on the bill of lading: \"OPLU3041728\" struck through, \"OPLU3041722\" written in",
+      "detail": "ISO 6346 check digit: original INVALID, replacement valid. The original number cannot be a real container; the handwritten correction is consistent.",
+      "evidence": [
+        {
+          "source": "bill_of_lading",
+          "file": "BMLVHCM26090418_House_BL.pdf",
+          "text": "OPLU3041728 → OPLU3041722"
+        }
+      ],
+      "resolution": "Using OPLU3041722. Broker should confirm against the carrier's manifest (arrival notice), since an unendorsed hand correction is not authoritative.",
+      "autoApplied": true
+    },
+    {
+      "id": "TOTALS_MASK_LINE_MISMATCH",
+      "severity": "warning",
+      "category": "quantity",
+      "field": "totals.quantity",
+      "title": "Both documents total 5100 pieces, but they are not counting the same things",
+      "detail": "Grand totals agree while individual lines do not, so a total-level check alone would have passed. Check whether one document includes free samples and the other does not.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "Total quantity 5100"
+        },
+        {
+          "source": "packing_list",
+          "file": "SPG-PL-2609-117_Packing_List.pdf",
+          "text": "Grand total 5100"
+        }
+      ],
+      "resolution": "Reconcile line by line (above).",
+      "autoApplied": false
+    },
+    {
+      "id": "GROSS_WEIGHT_MISMATCH",
+      "severity": "warning",
+      "category": "transport",
+      "field": "grossKg",
+      "title": "Gross weight differs: 1888 kg (packing list) vs 1930 kg (transport document)",
+      "detail": "A gap of 42.00 kg (2.2%). Pallets or dunnage counted by the carrier are a common cause, but the packing list says the cartons were not palletized.",
+      "evidence": [
+        {
+          "source": "packing_list",
+          "file": "SPG-PL-2609-117_Packing_List.pdf",
+          "text": "Total G.W. 1888 kg"
+        },
+        {
+          "source": "bill_of_lading",
+          "file": "BMLVHCM26090418_House_BL.pdf",
+          "text": "Gross weight 1930 kg"
+        }
+      ],
+      "resolution": "Using 1930 kg from the transport document, which is what the manifest carries. Broker should confirm.",
+      "autoApplied": false
+    },
+    {
+      "id": "HTS_INCOMPLETE",
+      "severity": "warning",
+      "category": "classification",
+      "field": "lines[NB-T101].hts",
+      "title": "Line 1 (NB-T101): only a 6-digit HS code (6109.10) is given",
+      "detail": "The first 6 digits are international and fix the heading. The US 8-digit subheading and 2-digit statistical suffix depend on details like gender, knit vs woven, fibre content and garment features, and they set the duty rate. Description: MEN'S CREW NECK SHORT SLEEVE T-SHIRT, 100% Cotton single jersey, 160 GSM, knitted.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "text": "HS 6109.10"
+        }
+      ],
+      "resolution": "The XML carries the 6 digits exactly as printed (never zero-padded, which would look like a real classification). Broker must classify to 10 digits (hts.usitc.gov, heading 6109) and check Chapter 99 additional duties for origin VN.",
+      "autoApplied": false
+    },
+    {
+      "id": "HTS_INCOMPLETE",
+      "severity": "warning",
+      "category": "classification",
+      "field": "lines[NB-H205].hts",
+      "title": "Line 2 (NB-H205): only a 6-digit HS code (6110.20) is given",
+      "detail": "The first 6 digits are international and fix the heading. The US 8-digit subheading and 2-digit statistical suffix depend on details like gender, knit vs woven, fibre content and garment features, and they set the duty rate. Description: WOMEN'S PULLOVER HOODIE W/ KANGAROO POCKET, 60% Cotton 40% Polyester brushed fleece, 280 GSM, knitted.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "text": "HS 6110.20"
+        }
+      ],
+      "resolution": "The XML carries the 6 digits exactly as printed (never zero-padded, which would look like a real classification). Broker must classify to 10 digits (hts.usitc.gov, heading 6110) and check Chapter 99 additional duties for origin VN.",
+      "autoApplied": false
+    },
+    {
+      "id": "HTS_INCOMPLETE",
+      "severity": "warning",
+      "category": "classification",
+      "field": "lines[NB-C330].hts",
+      "title": "Line 3 (NB-C330): only a 6-digit HS code (6203.42) is given",
+      "detail": "The first 6 digits are international and fix the heading. The US 8-digit subheading and 2-digit statistical suffix depend on details like gender, knit vs woven, fibre content and garment features, and they set the duty rate. Description: MEN'S SLIM FIT CHINO TROUSERS, 98% Cotton 2% Elastane stretch twill, 245 GSM, woven.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "text": "HS 6203.42"
+        }
+      ],
+      "resolution": "The XML carries the 6 digits exactly as printed (never zero-padded, which would look like a real classification). Broker must classify to 10 digits (hts.usitc.gov, heading 6203) and check Chapter 99 additional duties for origin VN.",
+      "autoApplied": false
+    },
+    {
+      "id": "HTS_INCOMPLETE",
+      "severity": "warning",
+      "category": "classification",
+      "field": "lines[W-B220].hts",
+      "title": "Line 4 (W-B220): only a 6-digit HS code (6206.40) is given",
+      "detail": "The first 6 digits are international and fix the heading. The US 8-digit subheading and 2-digit statistical suffix depend on details like gender, knit vs woven, fibre content and garment features, and they set the duty rate. Description: WOMEN'S LONG SLEEVE BLOUSE, V-NECK, 100% Polyester crepe de chine, woven.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "text": "HS 6206.40"
+        }
+      ],
+      "resolution": "The XML carries the 6 digits exactly as printed (never zero-padded, which would look like a real classification). Broker must classify to 10 digits (hts.usitc.gov, heading 6206) and check Chapter 99 additional duties for origin VN.",
+      "autoApplied": false
+    },
+    {
+      "id": "HTS_INCOMPLETE",
+      "severity": "warning",
+      "category": "classification",
+      "field": "lines[NB-P118S].hts",
+      "title": "Line 5 (NB-P118S): only a 6-digit HS code (6106.10) is given",
+      "detail": "The first 6 digits are international and fix the heading. The US 8-digit subheading and 2-digit statistical suffix depend on details like gender, knit vs woven, fibre content and garment features, and they set the duty rate. Description: WOMEN'S SHORT SLEEVE POLO SHIRT - SAMPLES, 100% Cotton pique, knitted.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "text": "HS 6106.10"
+        }
+      ],
+      "resolution": "The XML carries the 6 digits exactly as printed (never zero-padded, which would look like a real classification). Broker must classify to 10 digits (hts.usitc.gov, heading 6106) and check Chapter 99 additional duties for origin BD.",
+      "autoApplied": false
+    },
+    {
+      "id": "IMPORTER_OF_RECORD",
+      "severity": "warning",
+      "category": "parties",
+      "field": "importer",
+      "title": "Importer of record assumed to be the buyer, NORTHBOUND OUTFITTERS, INC., not the B/L consignee, CASCADE FULFILLMENT PARTNERS LLC",
+      "detail": "The buyer holds the P.O. and is invoiced. The consignee on the transport document looks like a warehouse/3PL and the invoice says the delivery is \"For account of: Northbound Outfitters, Inc.\". The consignee is a transport role; the importer of record is whoever is liable for duties. The ultimate consignee on the entry is likely also the buyer.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "Sold to: NORTHBOUND OUTFITTERS, INC."
+        },
+        {
+          "source": "bill_of_lading",
+          "file": "BMLVHCM26090418_House_BL.pdf",
+          "text": "Consignee: CASCADE FULFILLMENT PARTNERS LLC"
+        },
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "For account of: Northbound Outfitters, Inc."
+        }
+      ],
+      "resolution": "Entered NORTHBOUND OUTFITTERS, INC. as importer of record. Broker must confirm and supply its IRS/EIN importer number (no document carries it) and confirm a valid bond and CBP Form 5106 are on file.",
+      "autoApplied": true
+    },
+    {
+      "id": "MID_REVIEW",
+      "severity": "warning",
+      "category": "parties",
+      "field": "manufacturers[M1].mid",
+      "title": "MID for SAIGON PHOENIX GARMENT JOINT STOCK COMPANY is VNSAIPHO78DIA; needs a check",
+      "detail": "Built per 19 CFR Part 102 Appendix. Street line \"Lot C7-C8, Road No. 9, Song Than 2 Industrial Park, Di An Ward\" mixes letters and digits; confirm which number CBP expects.",
+      "evidence": [
+        {
+          "source": "packing_list",
+          "text": "SAIGON PHOENIX GARMENT JOINT STOCK COMPANY, Lot C7-C8, Road No. 9, Song Than 2 Industrial Park, Di An Ward, Di An City"
+        }
+      ],
+      "resolution": "Broker should check it against the MID already on file in NetCHB's manufacturer table, if one exists.",
+      "autoApplied": false
+    },
+    {
+      "id": "ISF_CHECK",
+      "severity": "warning",
+      "category": "completeness",
+      "field": "isf",
+      "title": "ISF: \"ISF FILED BY: IMPORTER/AGENT\"",
+      "detail": "Ocean shipments need an Importer Security Filing at least 24 hours before loading. Late or missing ISF can carry a USD 5,000 penalty.",
+      "evidence": [
+        {
+          "source": "bill_of_lading",
+          "file": "BMLVHCM26090418_House_BL.pdf",
+          "text": "ISF FILED BY: IMPORTER/AGENT"
+        }
+      ],
+      "resolution": "Broker should confirm the ISF transaction number before filing the entry.",
+      "autoApplied": false
+    },
+    {
+      "id": "MARKING_ORIGIN_CONFLICT",
+      "severity": "warning",
+      "category": "marking",
+      "field": "marking",
+      "title": "Cartons are marked \"MADE IN VIETNAM\" but Line 5 (NB-P118S) originates in BD",
+      "detail": "Containers must be marked with the true country of origin of their contents. Mis-marked cartons can be held for re-marking and incur marking duties (19 CFR 134).",
+      "evidence": [
+        {
+          "source": "packing_list",
+          "file": "SPG-PL-2609-117_Packing_List.pdf",
+          "text": "Shipping marks: NORTHBOUND OUTFITTERS / PO#: NB-26-0918 / STYLE#: / COLOUR / SIZE: / QTY: PCS / C/NO.: 1 - 138 / MADE IN VIETNAM"
+        }
+      ],
+      "resolution": "Broker should alert the importer; the affected cartons may need re-marking before release.",
+      "autoApplied": false
+    },
+    {
+      "id": "NO_COMMERCIAL_VALUE",
+      "severity": "info",
+      "category": "valuation",
+      "field": "lines[NB-P118S].enteredValue",
+      "title": "Line 5 (NB-P118S) is free of charge but still has to be entered",
+      "detail": "The invoice marks this line as no-commercial-value and leaves it out of the invoice total. CBP still requires every article to be declared at a value, so it stays on the entry at the stated customs value.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "WOMEN'S SHORT SLEEVE POLO SHIRT - SAMPLES | FOC SAMPLES - NO COMMERCIAL VALUE | Value for customs purpose only USD 1.00/pc | (Origin: Bangladesh)"
+        }
+      ],
+      "resolution": "Kept on the entry at the stated customs value. Broker should confirm the value is reasonable (cost of production is the usual basis for samples).",
+      "autoApplied": false
+    },
+    {
+      "id": "NON_DUTIABLE_CHARGES_EXCLUDED",
+      "severity": "info",
+      "category": "valuation",
+      "field": "enteredValue",
+      "title": "CIF invoice: USD 4,035.00 of freight and insurance excluded from dutiable value",
+      "detail": "Invoice total USD 27,270.00 less freight USD 3,850.00 and insurance USD 185.00 gives the goods value. Plus assists of USD 4,180.00, total entered value is USD 27,439.00.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "Incoterms CIF TACOMA, WA (INCOTERMS 2020)"
+        },
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "Ocean Freight (Cat Lai - Tacoma): 3850"
+        },
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "Marine Insurance Premium: 185"
+        }
+      ],
+      "resolution": "Freight and insurance are reported on the entry as non-dutiable charges (needed for the CIF value field).",
+      "autoApplied": true
+    },
+    {
+      "id": "SELLER_NOT_MANUFACTURER",
+      "severity": "info",
+      "category": "parties",
+      "field": "manufacturers",
+      "title": "Seller KOWLOON BAY APPAREL SOURCING LIMITED is a trading intermediary; MID is built from the factory instead",
+      "detail": "The invoice is issued by KOWLOON BAY APPAREL SOURCING LIMITED (Hong Kong), but the goods were made by SAIGON PHOENIX GARMENT JOINT STOCK COMPANY (VN) and SP Garments Dhaka Ltd. (BD). CBP's MID identifies the producer.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "Seller: KOWLOON BAY APPAREL SOURCING LIMITED"
+        },
+        {
+          "source": "packing_list",
+          "text": "Manufacturer: SAIGON PHOENIX GARMENT JOINT STOCK COMPANY"
+        },
+        {
+          "source": "packing_list",
+          "text": "Manufacturer: SP Garments Dhaka Ltd."
+        }
+      ],
+      "resolution": "MID constructed from the manufacturer. The seller is reported as the seller party.",
+      "autoApplied": true
+    },
+    {
+      "id": "HOUSE_AND_MASTER_BILL",
+      "severity": "info",
+      "category": "transport",
+      "field": "bills",
+      "title": "House bill BMLVHCM26090418 (BMLV) moves under master bill OPLUSGN260917735 (OPLU)",
+      "detail": "An NVOCC issued this bill. The entry must reference the bill as it appears on the carrier's manifest; for most ocean entries that is the house bill, prefixed with the NVOCC's SCAC, with the master bill for context.",
+      "evidence": [
+        {
+          "source": "bill_of_lading",
+          "file": "BMLVHCM26090418_House_BL.pdf",
+          "text": "B/L No. BMLVHCM26090418"
+        },
+        {
+          "source": "bill_of_lading",
+          "file": "BMLVHCM26090418_House_BL.pdf",
+          "text": "MBL: OPLUSGN260917735"
+        }
+      ],
+      "resolution": "Both bills are carried in the XML. Broker should confirm which bill was filed in AMS (the B/L says AMS was filed by the NVOCC).",
+      "autoApplied": true
+    },
+    {
+      "id": "PORT_CODE_DERIVED",
+      "severity": "info",
+      "category": "transport",
+      "field": "usPortCode",
+      "title": "Port of unlading TACOMA, WA, USA → CBP port code 3002",
+      "detail": "Port of entry is assumed to be the port of unlading. Final delivery is KENT, WA (DOOR); if the cargo moves in-bond, the entry port changes.",
+      "evidence": [
+        {
+          "source": "bill_of_lading",
+          "file": "BMLVHCM26090418_House_BL.pdf",
+          "text": "Port of discharge: TACOMA, WA, USA"
+        }
+      ],
+      "resolution": "Broker should confirm the port of entry.",
+      "autoApplied": true
+    },
+    {
+      "id": "DATE_AMBIGUOUS",
+      "severity": "info",
+      "category": "dates",
+      "field": "invoiceDate",
+      "title": "Invoice date \"12/09/2026\" can be read as 2026-09-12 or 2026-12-09",
+      "detail": "Only 2026-09-12 falls before the export date (2026-09-24), so the document uses day/month order.",
+      "evidence": [
+        {
+          "source": "commercial_invoice",
+          "file": "KBAS-NB-26-0912_Commercial_Invoice.pdf",
+          "text": "Invoice Date: 12/09/2026"
+        }
+      ],
+      "resolution": "Using 2026-09-12.",
+      "autoApplied": true
+    },
+    {
+      "id": "XML_NOT_TRANSMITTED",
+      "severity": "info",
+      "category": "filing",
+      "field": "transmit",
+      "title": "The XML has no <transmit/> tag, so uploading it stages the entry in NetCHB without sending anything to CBP",
+      "detail": "Per entry.xsd: \"The <transmit /> tag is optional. If included, NetChb will automatically transmit the entry summary to customs once the upload of this entry is complete.\" This tool never adds it.",
+      "evidence": [],
+      "resolution": "A licensed broker reviews the staged entry in NetCHB and transmits it from there.",
+      "autoApplied": true
+    },
+    {
+      "id": "XML_ENTRY_DATE_ASSUMED",
+      "severity": "info",
+      "category": "filing",
+      "field": "header.entry-date",
+      "title": "Entry date set to the estimated arrival date, 2026-10-14",
+      "detail": "NetCHB requires an entry date. No document carries one; the estimated arrival is the usual starting point for a pre-arrival entry.",
+      "evidence": [],
+      "resolution": "Broker should set the actual entry date.",
+      "autoApplied": true
+    },
+    {
+      "id": "XML_HEADER_WHOLE_DOLLARS",
+      "severity": "info",
+      "category": "filing",
+      "field": "header.charges",
+      "title": "Header charges and total entered value are whole dollars",
+      "detail": "entry.xsd types <charges> and <total-entry-value> as integers. Charges 4035.00 → 4035; entered value 27439.00 → 27439. Line values keep cents.",
+      "evidence": [],
+      "resolution": "None; NetCHB recomputes header totals from the lines.",
+      "autoApplied": true
+    },
+    {
+      "id": "XML_STATE_OF_DESTINATION",
+      "severity": "info",
+      "category": "filing",
+      "field": "header.state-destination",
+      "title": "State of destination WA, from the delivery address (CASCADE FULFILLMENT PARTNERS LLC), not the importer's OR",
+      "detail": "CBP wants the state where the goods are delivered, which here is the ship-to warehouse.",
+      "evidence": [],
+      "resolution": "Broker should confirm.",
+      "autoApplied": true
+    },
+    {
+      "id": "XML_BILL_SCAC_SPLIT",
+      "severity": "info",
+      "category": "filing",
+      "field": "manifest.bill-of-lading",
+      "title": "Bill numbers split into SCAC + bill number",
+      "detail": "NetCHB has separate SCAC and bill fields. Master OPLUSGN260917735 → OPLU + SGN260917735; house BMLVHCM26090418 → BMLV + HCM26090418. This follows the AMS convention where the printed bill number begins with the issuer's SCAC.",
+      "evidence": [],
+      "resolution": "Broker should confirm the bill numbers match the carrier's AMS filing.",
+      "autoApplied": true
+    },
+    {
+      "id": "XML_ENTITY_NAME_SHORTENED",
+      "severity": "info",
+      "category": "filing",
+      "field": "ace-cargo-release-parties",
+      "title": "Party names shortened to NetCHB's 35-character limit",
+      "detail": "\"KOWLOON BAY APPAREL SOURCING LIMITED\" → \"KOWLOON BAY APPAREL SOURCING LTD\"",
+      "evidence": [],
+      "resolution": "None needed unless the broker's NetCHB party profile uses a different name.",
+      "autoApplied": true
+    },
+    {
+      "id": "XML_INVOICE_NO_NORMALISED",
+      "severity": "info",
+      "category": "filing",
+      "field": "invoice.invoice-no",
+      "title": "Invoice number \"KBAS/NB/26-0912\" entered as \"KBASNB26-0912\"",
+      "detail": "entry.xsd allows only letters, digits and hyphens in an invoice number (max 17), so the other characters were removed.",
+      "evidence": [],
+      "resolution": "Broker should confirm this matches how the invoice is referenced in their records.",
+      "autoApplied": true
+    },
+    {
+      "id": "XML_ASSIST_IN_LINE_VALUE",
+      "severity": "info",
+      "category": "filing",
+      "field": "invoice.line-items.tariff.value",
+      "title": "Assists are included in the line value (W-B220: 1260.00 + 4180.00)",
+      "detail": "entry.xsd has no assist element; its value-adjustment tag is documented only for proration. The tariff <value> is the entered value, which by law includes assists.",
+      "evidence": [],
+      "resolution": "Broker should confirm how their NetCHB account records assists (some brokers also note them in the line description).",
+      "autoApplied": true
+    },
+    {
+      "id": "XML_HTS_AS_PRINTED",
+      "severity": "info",
+      "category": "filing",
+      "field": "invoice.line-items.tariff-no",
+      "title": "5 line(s) carry the tariff number exactly as printed (6109.10, 6110.20, 6203.42, 6206.40, 6106.10), not padded to 10 digits",
+      "detail": "entry.xsd accepts 5 to 10 digits, so the file validates, but CBP needs a 10-digit HTSUS number. Padding with zeros would look like a real classification, so the digits are left as printed and NetCHB will flag them.",
+      "evidence": [],
+      "resolution": "Broker must classify each line to 10 digits (enter them in the HTS fields).",
+      "autoApplied": true
+    }
+  ]
+}

@@ -12,6 +12,10 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
+    // `_name` marks a value that is deliberately unused (e.g. stripped by destructuring).
+    rules: { "@typescript-eslint/no-unused-vars": ["warn", { varsIgnorePattern: "^_", argsIgnorePattern: "^_" }] },
+  },
+  {
     ignores: [
       "node_modules/**",
       ".next/**",

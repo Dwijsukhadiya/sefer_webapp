@@ -4,6 +4,9 @@ import { ev, lineLabel } from "../helpers";
 import type { Finding, Rule } from "../types";
 
 const NCV = /\b(FOC|F\.O\.C|FREE OF CHARGE|NO COMMERCIAL VALUE|NCV|N\.C\.V|SAMPLES?)\b/i;
+// "Fabric supplied free of charge by buyer" describes an assist, not free goods.
+const ABOUT_BUYER_MATERIALS = /\b(by (the )?buyer|buyer[- ]?supplied|buyer'?s (fabric|material)|CMT|cut,? make)\b/i;
+const saysFree = (text: string) => NCV.test(text) && !ABOUT_BUYER_MATERIALS.test(text);
 
 /** Free/sample lines still go on the entry, with a value for customs purposes. */
 export const noCommercialValue: Rule = {
@@ -14,7 +17,7 @@ export const noCommercialValue: Rule = {
     const items = docsOf(docs, "commercial_invoice").flatMap((d) => d.lineItems.map((li) => ({ d, li })));
     for (const line of facts.lines) {
       const src = items.find((x) => (x.li.styleOrSku ?? x.li.lineNo) === line.key);
-      const flagged = src?.li.excludedFromTotal || line.notes.some((n) => NCV.test(n)) || NCV.test(line.description);
+      const flagged = src?.li.excludedFromTotal || line.notes.some(saysFree) || saysFree(line.description);
       if (!flagged) continue;
       line.noCommercialValue = true;
       if (line.amountCents === null && line.quantity !== null && line.unitPrice !== null) {

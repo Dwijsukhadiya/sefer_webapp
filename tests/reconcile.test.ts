@@ -31,6 +31,7 @@ describe("shipment-001 known traps", () => {
     const q = r.findings.filter((x) => x.id === "QUANTITY_MISMATCH");
     expect(q).toHaveLength(1);
     expect(q[0].field).toContain("NB-H205");
+    expect(q[0].detail).toMatch(/equals the 24 free samples on Line 5/);
     expect(ids(r)).toContain("TOTALS_MASK_LINE_MISMATCH");
   });
 

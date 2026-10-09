@@ -42,6 +42,18 @@ export const parties: Rule = {
       });
     }
 
+    const assumed = facts.manufacturers.find((m) => m.assumedFromSeller);
+    if (assumed) {
+      out.push({
+        id: "MANUFACTURER_ASSUMED_SELLER", severity: "warning", category: "parties", field: "manufacturers",
+        title: `No factory is named, so the seller ${assumed.name} is assumed to be the manufacturer`,
+        detail: "The MID must identify the producer. Sellers are often the factory, but trading companies are common too, and a MID built from a trader is wrong.",
+        evidence: inv ? [ev(inv, `Seller: ${assumed.name}`)] : [],
+        resolution: `MID ${assumed.mid ?? "(not computable)"} built from the seller. Broker must confirm the seller made the goods.`,
+        autoApplied: true,
+      });
+    }
+
     // Seller is not the manufacturer
     if (seller && facts.manufacturers.length && !facts.manufacturers.some((m) => sameCompany(m.name, seller.name))) {
       out.push({

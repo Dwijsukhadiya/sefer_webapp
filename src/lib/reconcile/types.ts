@@ -20,7 +20,8 @@ export type FindingCategory =
   | "classification"
   | "dates"
   | "marking"
-  | "completeness";
+  | "completeness"
+  | "filing"; // how a fact was fitted into the NetCHB schema
 
 export interface Finding {
   id: string; // stable rule id, e.g. "LINE_EXTENSION_MISMATCH"
@@ -50,6 +51,7 @@ export interface ManufacturerFact extends PartyFact {
   key: string; // stable id used by lines
   mid: string | null;
   midNeedsReview: string[];
+  assumedFromSeller?: boolean; // no producer named anywhere; the seller is assumed to be it
 }
 
 export interface EntryLine {
@@ -82,6 +84,7 @@ export interface ContainerFact {
   number: string;
   seals: string[];
   checkDigitValid: boolean | null;
+  sizeType: string | null; // as printed, e.g. "1 X 20'GP"
 }
 
 export interface ShipmentFacts {
@@ -97,6 +100,7 @@ export interface ShipmentFacts {
   consignee: PartyFact | null;
   seller: PartyFact | null;
   buyer: PartyFact | null;
+  shipTo: PartyFact | null; // deliver-to on the invoice; decides state of destination
   manufacturers: ManufacturerFact[];
 
   houseBill: string | null;
