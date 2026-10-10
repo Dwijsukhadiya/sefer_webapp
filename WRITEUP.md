@@ -1,76 +1,46 @@
 # Writeup: Sefer Entry Prep
 
-## Approach
+**Approach.** One bet: *the model reads, the code decides.* An LLM transcribes each page verbatim, including wrong numbers, struck-through values and footnotes. Everything after that is deterministic, tested TypeScript: 19 reconciliation rules, valuation, party roles, MID construction and the NetCHB mapping. Every number is explainable, nothing is changed silently (each change is a finding with both values and the evidence), and a broker's edits rebuild the entry instantly with no model call.
 
-I made one bet: **the model reads, the code decides.** Extraction is the only probabilistic step. It returns what each page says, verbatim, including the wrong numbers, the struck-through container and the footnotes. Reconciliation (16 rules), valuation, party resolution, MID construction and XML mapping are deterministic TypeScript with tests. That makes every number explainable and every finding reproducible. It also means `/api/entry` is a pure function, so a broker's edits rebuild the entry instantly with no model call.
+**Finding NetCHB's format.** The brief gave no link. NetCHB's own server exposed its `EntryUploadService` WSDL (`uploadEntry(username, password, entryXml)`), and probing found `/xml/entry/entry.xsd` and its `data_type.xsd`. Both are committed byte-for-byte, with hashes and the full trail, dead ends included (`schemas/SOURCE.md`). The schema settled two assumptions: omitting `<transmit/>` only stages the entry, and NetCHB computes duty itself. It also exposed traps the sample hides: invoice numbers allow only `[A-Za-z0-9-]`, names are capped at 35 characters, and origin and MID are per line. The sample's XML validates against the real XSD.
 
-## Finding NetCHB's format
+**Judgment calls on the sample.**
+- **Line 1 printed 6,480;** 2,400 × 2.85 = 6,840. Only 6,840 reconciles to the subtotal, so the printed figure is the typo.
+- **Both documents total 5,100 pieces, but the hoodie is 1,200 vs 1,176.** The gap is the 24 free samples, counted separately on the invoice and inside the packing list total. Reconciling per style catches what matching totals hide.
+- **Buyer-supplied fabric (USD 4,180) is an assist:** 1,260 + 4,180 = 5,440.
+- **Free samples are still entered** (USD 24) with Bangladesh origin and their own manufacturer, contradicting the invoice's "Vietnam origin" declaration and the carton marks.
+- **The MID is built from the Vietnamese factory, not the Hong Kong seller.**
+- **The importer of record is the buyer, not the 3PL consignee.** Flagged and switchable, never decided silently.
+- **CIF 27,270 becomes an entered value of 27,439,** after removing freight and insurance and adding the assist and samples.
+- **The container number is taken from the handwritten correction,** because the ISO check digit proves the struck-through one cannot exist. Still flagged.
+- **6-digit HS codes are kept as printed, never zero-padded.**
 
-The brief gave no link, so I went to NetCHB's own server. Its JBossWS service index exposed the `EntryUploadService` WSDL (`uploadEntry(username, password, entryXml)`). The WSDL types the entry as a bare string, so I kept probing paths until `/xml/entry/entry.xsd` answered. Its import led to `data_type.xsd`. Both are committed untouched, with hashes and the full trail, including the 404s, in `schemas/SOURCE.md`. Reading the schema turned two assumptions into facts. `<transmit/>` is what sends to CBP, so my XML omits it and only stages the entry. NetCHB computes duty unless `<precalculated/>` is set. It also exposed traps no sample would show: invoice numbers allow only `[A-Za-z0-9-]{1,17}` (so `KBAS/NB/26-0912` is invalid as printed), party names are capped at 35 characters, and origin and MID exist only per line. The sample entry validates against the real XSD, and a test proves the validator rejects broken variants.
+**What I don't know.** 10-digit classification and Chapter 99 duties are broker judgement. The bill-number format (SCAC split) is inferred from AMS convention. Without a NetCHB account I couldn't test whether its business rules accept everything the XSD does. The MID for "Lot C7-C8" is flagged for checking.
 
-## Judgment calls on the sample
+**Generalising and testing.** Rules follow document meaning, not this invoice's layout. 95 tests cover:
+- the 11 sample traps;
+- shipments the app has never seen: EUR/FOB, an air waybill, invoice only, no HS codes, seller-is-factory, two invoices;
+- regression cases from real model output.
 
-| What the documents say | What I did | Why |
-|---|---|---|
-| Line 1 printed 6,480.00; 2,400 × 2.85 = 6,840.00 | Entered 6,840, flagged | Only 6,840 reconciles to the 21,975 subtotal, so the printed extension is the typo. Without that cross-check the rule leaves the value alone. |
-| Both documents total 5,100 pcs | Reconciled per style: the hoodie is 1,200 vs 1,176 | The gap equals the 24 FOC samples. The invoice counts them separately, the packing list inside its total. Matching totals were camouflage. Entered at the invoice quantity, pending confirmation. |
-| W-B220 "CMT price", buyer fabric USD 4,180 | Line value 1,260 + 4,180 = 5,440 | An assist under 19 U.S.C. 1401a(h). The XSD has no assist element, so it goes in the line value and a finding says so. |
-| 24 FOC polo samples, "(Origin: Bangladesh)" | Kept on the entry at USD 24, origin BD, MID from SP Garments Dhaka | Free goods are still entered. The line remark overrides the invoice's single-origin declaration, which I flag as inaccurate, along with the "MADE IN VIETNAM" carton marks. |
-| Seller in Hong Kong, factory in Binh Duong | MID `VNSAIPHO78DIA` from the factory | The MID identifies the producer. "Lot C7-C8" is ambiguous under the CFR address rule, so it is flagged for checking. |
-| B/L consignee is a 3PL "for account of" the buyer | Importer = buyer, flagged, switchable | The consignee is a transport role. I never decide liability silently. |
-| CIF 27,270 | Entered value 27,439 = 23,235 FOB + 4,180 assist + 24 samples | Separately stated freight 3,850 and insurance 185 are not dutiable. |
-| Container 1728 struck through, 1722 handwritten | Used 1722, error-level finding | The ISO 6346 check digit says 1728 cannot exist. It still needs the carrier's arrival notice to confirm. |
-| HS 6-digit only | Emitted as printed, never zero-padded | A padded code looks like a real classification. The schema accepts 5 to 10 digits, so the file stays valid while NetCHB flags it. |
+Live Gemini extraction scored 97–98% field accuracy and still caught every trap. Real output and deployed testing exposed bugs the clean fixture never could, each now fixed and tested:
+- a Bangladesh factory borrowed for the Vietnam lines' MID;
+- an assist note that made a line look free;
+- false errors on multiple invoices;
+- timeouts when the model service was overloaded.
 
-Also caught: gross weight 1,888 vs 1,930 kg (the packing list says "palletized: NO", so pallets don't explain it), hoodie fibre 60/40 cotton vs "TC 65/35" (which flips the chief fibre and therefore the HTS subheading), and the ambiguous date 12/09/2026, resolved to 12 Sep because only that reading precedes shipment.
+One idea failed honestly. A second read by the *same* model dropped the *same* digit from the master bill, so independent verification needs a different model.
 
-## What I don't know
+**Built for a broker's workflow.**
+- The source document sits beside the data, and every piece of evidence links back to its page.
+- Validation errors read as fixes ("Line NB-T101: no tariff number…").
+- Possible agency requirements (FDA, FCC…) are flagged as hints.
+- An audit-trail export records what the model read, every manual edit, each correction with its evidence, the final XML, and file hashes (19 CFR 163 recordkeeping).
 
-- 10-digit HTS classification is broker judgment, and so are Chapter 99 remedies.
-- The bill-number format (whether to strip the SCAC prefix) is inferred from AMS convention, not stated by NetCHB.
-- Whether NetCHB's business rules accept everything the XSD accepts: I had no account to test an upload.
-- Which container number is real, until the carrier confirms.
+**With more time.**
+1. **Independent identifier verification.** Make a different-model second read the default; in testing, `gemini-3-flash-preview` correctly read the master bill the main model had misread, plus the house bill and container. Then cross-check bill and container numbers against the carrier's arrival notice or AMS data, because a wrong bill number fails cargo release.
+2. **Persistence and sign-off.** Saved shipments, a preparer-to-licensed-broker approval step, user roles, and a server-side, tamper-evident audit trail kept for the five-year retention period.
+3. **More document types.** Certificates of origin (to claim FTA and special-program preferences), arrival notices and ISF data, plus informal (11) and Section 321 (86) entries.
 
-## Generalising
+**Using AI.** I used AI assistants throughout: recon, reading the 6,700-line XSD, scaffolding, rules and tests. The full chat history is in the submission. The fixture the tests check against was hand-transcribed, not model-generated, so the model never grades its own work.
 
-Rules are written against document meaning, never this invoice's layout. Seven synthetic variants run in the test suite: EUR on FOB terms, CIF without itemised freight, an air waybill, invoice only, no HS codes, seller-is-factory, and two invoices. Each degrades honestly, with no crashes and findings that say what's missing. Building the variants found two real gaps, which I fixed: seller-as-manufacturer, and multi-invoice handling (now warned about).
-
-Running real extraction (Gemini) on the three sample PDFs scored 97–98% field accuracy against the hand-written fixture, and every trap was still caught from the model's own output. The live runs also exposed three bugs the clean fixture never could:
-- A sister factory in Bangladesh was being borrowed as the MID source for the Vietnam lines.
-- A "supplied free of charge by buyer" assist note made a line look free, which cancelled the 6,840 correction.
-- A generic "contracted factory" description was being treated as a manufacturer.
-
-Each is fixed, and pinned by a test built from the real output. The model's answers also vary between runs, which is exactly why the deterministic layer guards against plausible extraction shapes rather than trusting one.
-
-## Built for how a broker actually works
-
-A broker's job is verification, and their liability is the record. So the review screen keeps the source document beside the data. Every piece of quoted evidence links back to the page it came from, so checking an extracted value takes one click, not a hunt through a PDF viewer.
-
-Customs is not only tariffs. A line can also need FDA, FCC, EPA or other agency data. CBP decides that from the 10-digit HTS number, which these documents don't carry. So the app gives an early warning from the goods description. It names the agency, the word that triggered it, and the `entry.xsd` block where the data is filed or disclaimed. It is explicit that this is a hint, not a determination. On the sample it stays silent, which is right for adult apparel. I tuned it against apparel false positives ("ivory" is a colour, faux fur is not wildlife).
-
-Brokers must keep entry records for five years (19 CFR 163.4), and when CBP asks why an entry was filed a certain way, the answer has to be on paper. The audit export records:
-- what the model read, and every manual edit as an exact before/after;
-- each correction the rules made, with its evidence, kept separate from the issues still open;
-- the final XML;
-- hashes tying the record to the specific source files and schema.
-
-Building it surfaced a real provenance bug: git's Windows line-ending conversion had silently rewritten the "byte-for-byte" schema copy. A `.gitattributes` now pins those bytes, and a test checks the schema hash on every run.
-
-Finally, each panel has its own error boundary, so an odd document that breaks one view degrades that panel, not the whole screen.
-
-## Testing the live deployment
-
-I tested the deployed app the way a grader would: the sample, twelve shipment variants (with live results byte-identical to local), a single combined PDF, a phone photo, junk files, and oversized uploads. That surfaced issues no unit test had:
-- Two correct invoices were reported as arithmetic *errors*, because every line was checked against the first invoice's totals. Now each invoice is reconciled and entered on its own.
-- A 5 MB scan produced a cryptic JSON parse error. Now uploads go one file per request, and oversized files are refused up front with the reason.
-- The free Gemini tier allows 20 requests per model per day, and it ran out mid-test. Quota exhaustion is now recognised, skipped past model by model, and explained to the broker.
-
-One idea failed when tested, and I kept the lesson. To catch misread bill numbers I added a second, focused read of the identifiers. Live, both reads dropped the *same* digit from the master bill. Two reads by one model are not independent, and the check doubled quota use. So it is now opt-in with a *different* model. The free default is a deterministic check instead: numbers printed on two documents (the B/L number on the invoice, invoice numbers on the B/L) must agree.
-
-## With more time
-
-One `<invoice>` per source invoice. An HTS assistant backed by CROSS rulings. Schedule D/K tables loaded from CBP. NetCHB `ManufacturerService` lookup for MIDs. A real `uploadEntry` call behind broker credentials. Broker corrections fed back as extraction examples.
-
-## Using AI
-
-I used AI assistants throughout: recon, reading the 6,700-line XSD, scaffolding, rules and tests. The full chat history is in the submission. The fixture the tests check against was hand-transcribed, not model-generated, so the model never grades its own work.
+*Details: [README](README.md) · [User manual](docs/USER_MANUAL.md) · [NetCHB source trail](schemas/SOURCE.md)*

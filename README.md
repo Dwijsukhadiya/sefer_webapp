@@ -48,7 +48,7 @@ files ──► [1 EXTRACT]   model, one call per file          POST /api/extrac
              ▼
           DocumentExtraction[]   (editable in the UI)
              │
-             ├─► [2 RECONCILE]  TypeScript, 16 rules, zero model calls   ┐
+             ├─► [2 RECONCILE]  TypeScript, 19 rules, zero model calls   ┐
              │                  → ShipmentFacts + Finding[]              │ POST /api/entry
              └─► [3 MAP + EMIT] TypeScript → NetCHB XML → xmllint (WASM) │ pure function of
                                 vs entry.xsd + MissingField[]            ┘ (docs, broker inputs)
