@@ -62,10 +62,29 @@ You upload a shipment's documents: the commercial invoice, the packing list, and
 
 | Item | Details |
 |---|---|
-| A web browser | A current desktop browser; tested in Chrome and Microsoft Edge. Phones are supported for review. |
+| A web browser | Chrome, Microsoft Edge or Firefox (fully tested). Safari: see [Browser support](#browser-support). |
 | Documents | PDF, PNG, JPG or WEBP. Scans and phone photos are fine. |
 | File size | Up to **4.4 MB per file** on the website. |
 | An access code | Only if your administrator has switched one on. The sample shipment never needs one. |
+
+### Browser support
+
+Tested on the live website on 10 October 2026. Each browser went through the same walkthrough:
+- loading the sample;
+- opening findings and their evidence;
+- editing an extracted value and seeing the entry rebuild;
+- changing a broker input;
+- copying and downloading the XML;
+- exporting the audit trail;
+- the oversize-file check;
+- the phone layout.
+
+| Browser | Version tested | Result |
+|---|---|---|
+| **Google Chrome / Microsoft Edge** | Chromium 155 | ✅ Every feature works, including the PDF in the document pane. |
+| **Mozilla Firefox** | Firefox 131 | ✅ Every feature works, including the PDF in the document pane (Firefox's built-in PDF viewer). |
+| **Apple Safari** | WebKit 18 (Safari's engine, Windows test build) | ✅ Every feature works on the engine Safari uses. ⚠️ Real Safari on a Mac and its PDF display were **not** tested: Safari only runs on Apple devices. If the document pane is blank, use **Open ↗**. |
+| **Phones** | Chrome and Firefox at phone width | ✅ Sections stack, document buttons appear, no sideways scrolling. iPhone Safari not tested. |
 
 ### Quick start (5 minutes)
 
@@ -271,7 +290,7 @@ Each default is stated as a finding and can be changed.
 | **Access code** box appears | Your administrator requires a code for reading documents. | Enter the code you were given (see below). |
 | Red **✗ XSD error** in the XML panel | Required information is missing. | Follow **What to fix…** (step 5.7). |
 | A section shows **Unable to render…** | An unusual value broke that one section; the rest still works. | Check **Extracted documents** for odd values, then click **Try again**. |
-| The document pane is blank | Some browsers, especially on phones, can't show PDFs inside a page. | Use **Open ↗** to view it in a new tab. |
+| The document pane is blank | The browser can't show PDFs inside a page (some phones; Firefox with its PDF viewer turned off; untested Safari setups). | Use **Open ↗** to view it in a new tab. |
 
 ![Access code prompt](manual/images/12-access-code.png)
 
