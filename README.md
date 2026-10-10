@@ -7,6 +7,8 @@ Upload a shipment's documents (commercial invoice, packing list, bill of lading 
 
 The output for the sample shipment is committed: [`output/shipment-001-entry.xml`](output/shipment-001-entry.xml) (XSD-valid) and [`output/shipment-001-findings.json`](output/shipment-001-findings.json).
 
+**Live:** https://sefer-webapp.vercel.app · **Using the website:** [User Manual](docs/USER_MANUAL.md) (step-by-step, with annotated screenshots)
+
 ## Run it
 
 ```bash
